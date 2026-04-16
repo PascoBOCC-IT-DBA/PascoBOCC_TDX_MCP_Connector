@@ -13,6 +13,7 @@ import { registerProjectTools } from "./tools/projects.js";
 import { registerAccountTools } from "./tools/accounts.js";
 import { registerGroupTools } from "./tools/groups.js";
 import { registerAttributeTools } from "./tools/attributes.js";
+import { registerStatusTools } from "./tools/statuses.js";
 
 const config = loadConfig();
 const client = new TdxClient(config);
@@ -31,6 +32,7 @@ registerProjectTools(server, client);
 registerAccountTools(server, client);
 registerGroupTools(server, client);
 registerAttributeTools(server, client);
+registerStatusTools(server, client);
 
 const transport = new StdioServerTransport();
 await server.connect(transport);

@@ -1,3 +1,7 @@
+import dotenv from "dotenv";
+
+dotenv.config();
+
 export interface TdxConfig {
   baseUrl: string;
   beid: string;
