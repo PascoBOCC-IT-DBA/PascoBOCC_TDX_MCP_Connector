@@ -42,7 +42,7 @@ Test-WSMan -ComputerName <qa-server-fqdn> -Credential $cred
 - [ ] IIS 10 is installed
 - [ ] URL Rewrite module is installed
 - [ ] `E:\Websites\PASCO-TDX-MCP` directory exists
-- [ ] Node.js LTS (22.x+) is installed
+- [ ] Node.js LTS (24.x+) is installed
 - [ ] Firewall allows inbound HTTPS (443) and WinRM (5985/5986)
 - [ ] Outbound HTTPS to TDX API is allowed
 

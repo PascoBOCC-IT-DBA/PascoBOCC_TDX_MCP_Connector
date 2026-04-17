@@ -19,7 +19,7 @@ This deployment uses:
 
 ### On the QA DMZ Server
 - [ ] Windows Server 2022 with IIS 10 installed
-- [ ] Node.js LTS (22.x or later) installed and in PATH
+- [ ] Node.js LTS (24.x or later) installed and in PATH
 - [ ] npm available in PATH
 - [ ] **WinRM enabled** (check: `Enable-PSRemoting -Force` if not already enabled)
 - [ ] Application directory created: `E:\Websites\PASCO-TDX-MCP`
