@@ -2,7 +2,7 @@
 
 A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that wraps the [TeamDynamix (TDX) REST API](https://solutions.teamdynamix.com/TDWebApi/), enabling AI-assisted IT service management through MCP-compatible AI clients, including GitHub Copilot Chat.
 
-This server exposes **41 tools** across **9 domains** — tickets, assets, CMDB, knowledge base, people, projects, accounts, groups, and custom attributes — allowing natural language interaction with your TDX instance.
+This server exposes **43 tools** across **10 domains** — tickets, assets, CMDB, knowledge base, people, projects, accounts, groups, statuses, and custom attributes — allowing natural language interaction with your TDX instance.
 
 ## Quick Start
 
@@ -40,7 +40,7 @@ Tokens are fetched lazily on the first tool call and auto-refreshed after 23 hou
 | `TDX_WEB_SERVICES_KEY` | Yes | Web Services Key from TDAdmin |
 | `TDX_APP_ID` | Yes | Default TDX application ID (integer) |
 
-## Tools (41)
+## Tools (43)
 
 All tools that operate within an application accept an optional `appId` parameter to override the default from `TDX_APP_ID`.
 
@@ -58,7 +58,7 @@ All tools that operate within an application accept an optional `appId` paramete
 | `tdx-ticket-add-asset` | POST | `/{appId}/tickets/{id}/assets/{assetId}` | Link an asset to a ticket |
 | `tdx-ticket-add-contact` | POST | `/{appId}/tickets/{id}/contacts/{uid}` | Add a contact to a ticket |
 
-### Assets (7 tools)
+### Assets (8 tools)
 
 | Tool | Method | Endpoint | Description |
 |------|--------|----------|-------------|
@@ -69,6 +69,7 @@ All tools that operate within an application accept an optional `appId` paramete
 | `tdx-asset-delete` | DELETE | `/{appId}/assets/{id}` | Delete an asset |
 | `tdx-asset-search` | POST | `/{appId}/assets/search` | Search assets with filters |
 | `tdx-asset-feed-add` | POST | `/{appId}/assets/{id}/feed` | Add a comment to an asset |
+| `tdx-asset-categories` | GET | `/assets/forms` | Get all available asset categories/forms |
 
 ### CMDB / Configuration Items (7 tools)
 
@@ -127,7 +128,13 @@ These tools do not require an `appId`.
 |------|--------|----------|-------------|
 | `tdx-group-get` | GET | `/groups/{id}` | Get a group by ID |
 | `tdx-group-search` | POST | `/groups/search` | Search groups |
+Statuses (1 tool)
 
+| Tool | Method | Endpoint | Description |
+|------|--------|----------|-------------|
+| `tdx-statuses-get` | GET | `/{componentType}/statuses` | Get available statuses for a component type (tickets, assets, projects, cmdb, knowledgebase) |
+
+### 
 ### Custom Attributes (1 tool)
 
 | Tool | Method | Endpoint | Description |
@@ -222,13 +229,14 @@ TDX-MCP/
     mcp.json               # GitHub Copilot Chat MCP configuration
     settings.json          # VS Code input variable definitions
   src/
-    index.ts               # Entry point
-    config.ts              # Environment variable loading
-    auth.ts                # Admin token auth with auto-refresh
-    tdx-client.ts          # Shared HTTP client
-    tools/
-      tickets.ts           # 9 ticket tools
-      assets.ts            # 7 asset tools
+    index.ts               # 8 asset tools
+      cmdb.ts              # 7 CMDB/CI tools
+      kb.ts                # 5 knowledge base tools
+      people.ts            # 4 people tools
+      projects.ts          # 4 project tools
+      accounts.ts          # 2 account tools
+      groups.ts            # 2 group tools
+      statuses.ts          # 1 status tools
       cmdb.ts              # 7 CMDB/CI tools
       kb.ts                # 5 knowledge base tools
       people.ts            # 4 people tools

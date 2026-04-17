@@ -166,8 +166,8 @@ try {
         $sourceDir = ".\dist"
         $targetDir = "E:\Websites\PASCO-TDX-MCP"
         
-        Write-Host "Copying dist folder to: $targetDir"
-        Copy-Item -Path "$sourceDir\*" -Destination "$targetDir\" -ToSession $session -Recurse -Force
+        Write-Host "Copying dist folder to: $targetDir\dist"
+        Copy-Item -Path "$sourceDir" -Destination "$targetDir\dist" -ToSession $session -Recurse -Force
         
         Write-Host "Copying package.json"
         Copy-Item -Path ".\package.json" -Destination "$targetDir\package.json" -ToSession $session -Force
@@ -192,9 +192,9 @@ try {
             # Install production dependencies
             Write-Host "Installing production dependencies..."
             Push-Location $DeployDir
-            npm install --production
+            npm install --omit=dev
             if ($LASTEXITCODE -ne 0) {
-                throw "npm install --production failed"
+                throw "npm install --omit=dev failed"
             }
             
             # Create .env file
@@ -241,7 +241,7 @@ TDX_APP_ID=$AppId
             # Configure Application Pool
             $pool = Get-Item "IIS:\AppPools\$poolName"
             $pool.managedRuntimeVersion = "v4.0"
-            $pool.enable32BitAppOn64bit = $false
+            $pool.enable32BitAppOnWin64 = $false
             $pool | Set-Item
             
             Write-Host "  Application Pool configured"
@@ -312,17 +312,57 @@ TDX_APP_ID=$AppId
             Write-Host "Starting Node.js application..."
             Push-Location $DeployDir
             
-            $nodeProcess = Start-Process -FilePath "cmd.exe" `
-                -ArgumentList "/c npm start" `
-                -WindowStyle Hidden `
-                -PassThru
+            # Start npm start in background - captures all output
+            $pinfo = New-Object System.Diagnostics.ProcessStartInfo
+            $pinfo.FileName = "cmd.exe"
+            $pinfo.Arguments = "/c npm start"
+            $pinfo.UseShellExecute = $false
+            $pinfo.RedirectStandardOutput = $true
+            $pinfo.RedirectStandardError = $true
+            $pinfo.CreateNoWindow = $true
             
-            Start-Sleep -Seconds 3
+            $process = [System.Diagnostics.Process]::Start($pinfo)
+            $pid = $process.Id
             
-            if (Get-Process -Id $nodeProcess.Id -ErrorAction SilentlyContinue) {
-                Write-Host "✓ Node.js started (PID: $($nodeProcess.Id))"
+            # Wait for Node.js to start and listen on port 3000
+            $maxRetries = 15
+            $retries = 0
+            $listening = $false
+            
+            while ($retries -lt $maxRetries -and -not $listening) {
+                Start-Sleep -Seconds 1
+                $retries++
+                $listening = netstat -ano 2>$null | Select-String ":3000" | Select-String "LISTENING"
+                
+                if ($retries -eq 5) {
+                    Write-Host "  Still waiting for Node.js to start..."
+                }
+                
+                # Check if process died
+                if ($process.HasExited) {
+                    Write-Host "Node.js process exited unexpectedly."
+                    $stdout = $process.StandardOutput.ReadToEnd()
+                    $stderr = $process.StandardError.ReadToEnd()
+                    if ($stdout) {
+                        Write-Host "--- stdout ---"
+                        Write-Host $stdout
+                    }
+                    if ($stderr) {
+                        Write-Host "--- stderr ---"
+                        Write-Host $stderr
+                    }
+                    throw "Node.js process exited. See output above."
+                }
+            }
+            
+            if ($listening) {
+                Write-Host "✓ Node.js started and listening on port 3000 (PID: $pid)"
             } else {
-                throw "Node.js process failed to start"
+                # Try to get output from the still-running process
+                Write-Host "Node.js failed to listen on port 3000 after $maxRetries seconds."
+                Write-Host "Process is still running with PID: $pid"
+                Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+                throw "Node.js failed to start listening on port 3000."
             }
             
             Pop-Location
