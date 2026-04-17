@@ -5,11 +5,13 @@ export class TdxClient {
   private auth: TdxAuth;
   private baseUrl: string;
   public appId: number;
+  public assetsAppId?: number;
 
   constructor(config: TdxConfig) {
     this.auth = new TdxAuth(config);
     this.baseUrl = config.baseUrl;
     this.appId = config.appId;
+    this.assetsAppId = config.assetsAppId;
   }
 
   async request(

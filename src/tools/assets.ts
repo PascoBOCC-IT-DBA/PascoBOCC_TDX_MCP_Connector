@@ -3,7 +3,7 @@ import { z } from "zod";
 import { TdxClient } from "../tdx-client.js";
 
 export function registerAssetTools(server: McpServer, client: TdxClient) {
-  const defaultAppId = client.appId;
+  const defaultAppId = client.assetsAppId ?? client.appId;
 
   server.tool(
     "tdx-asset-create",
