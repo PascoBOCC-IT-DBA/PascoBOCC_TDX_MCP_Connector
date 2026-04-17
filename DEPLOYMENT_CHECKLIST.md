@@ -48,8 +48,11 @@ Test-WSMan -ComputerName <qa-server-fqdn> -Credential $cred
 
 ### Step 3: Configure GitHub Secrets
 
-1. Go to GitHub Repository → **Settings** → **Secrets and variables** → **Actions**
-2. Add these 8 secrets:
+1. Go to GitHub Repository → Click **Settings** (gear icon)
+2. In the left sidebar under **Security** → Click **Secrets and variables**
+3. Click the **Actions** tab (to scope secrets to GitHub Actions, not Codespaces or Dependabot)
+4. Click the **Secrets** tab at the top
+5. Click **New repository secret** for each of these 8 secrets:
 
 | Secret Name | Value |
 |-------------|-------|

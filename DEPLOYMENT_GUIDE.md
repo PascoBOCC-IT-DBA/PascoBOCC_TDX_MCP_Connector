@@ -42,8 +42,11 @@ Obtain these from TDAdmin > Organization Details > API Settings:
 GitHub Actions needs credentials and configuration to deploy to your QA server.
 
 1. Go to your GitHub repository
-2. Navigate to **Settings → Secrets and variables → Actions**
-3. Add the following secrets:
+2. Click **Settings** (gear icon in the top right)
+3. In the left sidebar under **Security**, click **Secrets and variables**
+4. Click the **Actions** tab (to scope secrets to GitHub Actions)
+5. Click the **Secrets** tab at the top
+6. Click **New repository secret** and add the following secrets:
 
 #### WinRM/DMZ Server Credentials
 - **Name:** `DMZ_WINRM_HOST`  
