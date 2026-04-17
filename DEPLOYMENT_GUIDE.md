@@ -83,12 +83,8 @@ You'll be prompted for:
 1. QA Server FQDN or IP address
 2. DMZ Domain username (DOMAIN\username)
 3. DMZ Domain password
-4. TDX Base URL
-5. TDX BEID
-6. TDX Web Services Key
-7. TDX App ID
 
-Review the summary and confirm with `yes` to proceed.
+The script will automatically load TDX configuration from your local `.env` file.
 
 **Optional: Pre-populate credentials to skip prompts:**
 
@@ -96,11 +92,7 @@ Review the summary and confirm with `yes` to proceed.
 .\scripts\deploy-local.ps1 `
     -QAServer "qa-dmz-server.domain.local" `
     -Username "DOMAIN\serviceaccount" `
-    -Password "YourPassword" `
-    -TDXBaseUrl "https://yourorg.teamdynamix.com/TDWebApi/api" `
-    -TDXBEID "your-beid-guid" `
-    -TDXWebServicesKey "your-key-guid" `
-    -TDXAppId 123
+    -Password "YourPassword"
 ```
 
 ### Step 3: Verify Deployment
@@ -115,7 +107,7 @@ Get-WebAppPool -Name "PASCO-TDX-MCP" | Select-Object Name, State
 netstat -ano | Select-String ":3000"
 
 # Check Virtual Application is configured
-Get-WebApplication -Name "PASCO-TDX-MCP" -Site "Default Web Site"
+Get-WebApplication -Name "PASCO-TDX-MCP" -Site "BCC"
 
 # Verify .env file exists
 Test-Path "E:\Websites\PASCO-TDX-MCP\.env"

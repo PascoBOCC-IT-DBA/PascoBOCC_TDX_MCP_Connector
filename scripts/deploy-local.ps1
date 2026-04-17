@@ -64,8 +64,31 @@ function Write-Error-Custom {
     Write-Host "✗ $Message" -ForegroundColor Red
 }
 
+function Read-EnvFile {
+    param([string]$Path = ".env")
+    $env = @{}
+    if (Test-Path $Path) {
+        Get-Content $Path | Where-Object { $_ -and -not $_.StartsWith('#') } | ForEach-Object {
+            if ($_ -match '^([^=]+)=(.*)$') {
+                $env[$matches[1].Trim()] = $matches[2].Trim()
+            }
+        }
+    }
+    return $env
+}
+
 try {
     Write-Heading "PASCO-TDX-MCP Local Deployment"
+    
+    # Load TDX configuration from local .env file
+    $envVars = Read-EnvFile ".env"
+    if ($envVars.Count -gt 0) {
+        Write-Host "Loaded TDX configuration from .env file"
+        if (-not $TDXBaseUrl -and $envVars['TDX_BASE_URL']) { $TDXBaseUrl = $envVars['TDX_BASE_URL'] }
+        if (-not $TDXBEID -and $envVars['TDX_BEID']) { $TDXBEID = $envVars['TDX_BEID'] }
+        if (-not $TDXWebServicesKey -and $envVars['TDX_WEB_SERVICES_KEY']) { $TDXWebServicesKey = $envVars['TDX_WEB_SERVICES_KEY'] }
+        if (-not $TDXAppId -and $envVars['TDX_APP_ID']) { $TDXAppId = [int]$envVars['TDX_APP_ID'] }
+    }
     
     # Collect credentials if not provided
     if (-not $QAServer) {
@@ -82,7 +105,9 @@ try {
         $Password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
     }
     
+    # Prompt for TDX config only if not already loaded from .env
     if (-not $TDXBaseUrl) {
+        Write-Host "TDX configuration not found in .env file. Please enter manually."
         $TDXBaseUrl = Read-Host "TDX Base URL"
     }
     
@@ -205,7 +230,7 @@ TDX_APP_ID=$AppId
             
             $poolName = "PASCO-TDX-MCP"
             $appName = "PASCO-TDX-MCP"
-            $siteName = "Default Web Site"
+            $siteName = "BCC"
             
             # Create or update Application Pool
             if (-not (Test-Path "IIS:\AppPools\$poolName")) {

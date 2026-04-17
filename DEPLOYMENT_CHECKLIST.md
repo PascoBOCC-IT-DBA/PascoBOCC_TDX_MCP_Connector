@@ -8,10 +8,7 @@ Quick reference for deploying PASCO-TDX-MCP to Windows Server 2022 IIS 10 using 
 - [ ] QA DMZ server FQDN or IP: `_______________________________`
 - [ ] DMZ domain account: `_______________________________`
 - [ ] DMZ domain password: `_______________________________`
-- [ ] TDX Base URL: `_______________________________`
-- [ ] TDX BEID: `_______________________________`
-- [ ] TDX Web Services Key: `_______________________________`
-- [ ] TDX App ID: `_______________________________`
+- [ ] TDX configuration in local `.env` file (BEID, Web Services Key, Base URL, App ID)
 
 ### Step 2: Prepare QA Server (Administrator)
 
@@ -43,17 +40,13 @@ From your machine in the repository root:
 .\scripts\deploy-local.ps1
 ```
 
-Or with pre-populated credentials:
+Or with pre-populated server credentials:
 
 ```powershell
 .\scripts\deploy-local.ps1 `
     -QAServer "qa-dmz-server.domain.local" `
     -Username "DOMAIN\serviceaccount" `
-    -Password "password" `
-    -TDXBaseUrl "https://yourorg.teamdynamix.com/TDWebApi/api" `
-    -TDXBEID "your-beid" `
-    -TDXWebServicesKey "your-key" `
-    -TDXAppId 123
+    -Password "password"
 ```
 
 **Checklist:**
