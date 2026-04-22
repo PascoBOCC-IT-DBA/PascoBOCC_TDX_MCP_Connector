@@ -39,6 +39,7 @@ Tokens are fetched lazily on the first tool call and auto-refreshed after 23 hou
 | `TDX_BEID` | Yes | Admin BEID from TDAdmin |
 | `TDX_WEB_SERVICES_KEY` | Yes | Web Services Key from TDAdmin |
 | `TDX_APP_ID` | Yes | Default TDX application ID (integer) |
+| `TDX_ASSETS_APP_ID` | No | TDX application ID for asset operations (integer). If not set, defaults to `TDX_APP_ID` |
 
 ## Tools (43)
 
