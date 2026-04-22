@@ -128,13 +128,13 @@ These tools do not require an `appId`.
 |------|--------|----------|-------------|
 | `tdx-group-get` | GET | `/groups/{id}` | Get a group by ID |
 | `tdx-group-search` | POST | `/groups/search` | Search groups |
-Statuses (1 tool)
+
+### Statuses (1 tool)
 
 | Tool | Method | Endpoint | Description |
 |------|--------|----------|-------------|
 | `tdx-statuses-get` | GET | `/{componentType}/statuses` | Get available statuses for a component type (tickets, assets, projects, cmdb, knowledgebase) |
 
-### 
 ### Custom Attributes (1 tool)
 
 | Tool | Method | Endpoint | Description |
@@ -229,20 +229,20 @@ TDX-MCP/
     mcp.json               # GitHub Copilot Chat MCP configuration
     settings.json          # VS Code input variable definitions
   src/
-    index.ts               # 8 asset tools
+    index.ts               # Main MCP server entry point
+    auth.ts                # TDX authentication (token management)
+    config.ts              # Configuration and validation
+    tdx-client.ts          # TDX API client
+    tools/
+      tickets.ts           # 9 ticket tools
+      assets.ts            # 8 asset tools
       cmdb.ts              # 7 CMDB/CI tools
       kb.ts                # 5 knowledge base tools
       people.ts            # 4 people tools
       projects.ts          # 4 project tools
       accounts.ts          # 2 account tools
       groups.ts            # 2 group tools
-      statuses.ts          # 1 status tools
-      cmdb.ts              # 7 CMDB/CI tools
-      kb.ts                # 5 knowledge base tools
-      people.ts            # 4 people tools
-      projects.ts          # 4 project tools
-      accounts.ts          # 2 account tools
-      groups.ts            # 2 group tools
+      statuses.ts          # 1 status tool
       attributes.ts        # 1 custom attributes tool
 ```
 
