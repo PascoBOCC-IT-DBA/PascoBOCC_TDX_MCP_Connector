@@ -19,7 +19,7 @@ const auth = new TdxAuth(config);
 async function exploreAssetStructure() {
   const token = await auth.getToken();
   const baseUrl = config.baseUrl;
-  const appId = config.assetsAppId ?? config.appId;
+  const appId = parseInt(process.env.TDX_ASSETS_APP_ID);
 
   // Try to get a sample asset to understand structure
   console.log(`=== Getting Sample Asset ===`);

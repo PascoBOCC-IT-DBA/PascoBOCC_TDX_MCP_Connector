@@ -18,7 +18,7 @@ const auth = new TdxAuth(config);
 async function getAssetCategoriesInfo() {
   const token = await auth.getToken();
   const baseUrl = config.baseUrl;
-  const appId = config.assetsAppId ?? config.appId;
+  const appId = parseInt(process.env.TDX_ASSETS_APP_ID);
 
   const endpoints = [
     `/cmdb/assets/types`,
