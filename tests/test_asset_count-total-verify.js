@@ -1,10 +1,23 @@
+/**
+ * Test: Total Asset Count Verification
+ * Description: Verifies the total count of assets in the TDX system by attempting
+ *              to retrieve all assets in a single request with maxResults set to 10,000.
+ *              Analyzes the response to determine if paging is required and whether
+ *              the API has hard limits on result size.
+ * 
+ * Purpose: This test helps understand the total asset inventory and API paging
+ *          requirements for asset management operations.
+ */
+
 import { spawn } from "child_process";
 import { createInterface } from "readline";
 import { fileURLToPath } from "url";
 import { dirname, resolve } from "path";
 
+// Get the directory where this test file is located
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+// Resolve to project root (parent of tests directory)
 const projectRoot = resolve(__dirname, "..");
 
 // Start the MCP server as a subprocess
