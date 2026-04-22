@@ -1,3 +1,9 @@
+/**
+ * Test: All Tickets Retrieval
+ * Description: Retrieves all tickets from your TDX system and provides a summary
+ *              of ticket data including counts by status and other ticket metrics.
+ */
+
 import { spawn } from "child_process";
 import { createInterface } from "readline";
 import { fileURLToPath } from "url";
@@ -36,56 +42,49 @@ const initRequest = {
   },
 };
 
-console.log("Creating a test service request ticket...\n");
+console.log("Sending initialize request...");
 server.stdin.write(JSON.stringify(initRequest) + "\n");
 
 // Listen for responses
 let initialized = false;
-let ticketCreated = false;
+let ticketsRequested = false;
 
 rl.on("line", (line) => {
   try {
     const response = JSON.parse(line);
     
-    // After initialization, create a ticket
+    // After initialization, search for open tickets with higher limit
     if (!initialized && response.id === 1) {
       initialized = true;
+      console.log("✓ Server initialized successfully!\n");
+      console.log("Searching for all open tickets (requesting 500 results)...\n");
 
-      const createRequest = {
+      const searchRequest = {
         jsonrpc: "2.0",
         id: messageId++,
         method: "tools/call",
         params: {
-          name: "tdx-ticket-create",
+          name: "tdx-ticket-search",
           arguments: {
-            typeId: 867, // "General" type
-            title: "Test Service Request - GitHub Copilot MCP Connector",
-            description: "This is a test ticket created by the MCP connector test script",
-            accountId: 2356, // Information Technology
-            priorityId: 329, // P3
-            statusId: 894, // New
+            statusIds: [894, 896, 3625], // New, In Process, Pending
+            maxResults: 500,
           },
         },
       };
-      server.stdin.write(JSON.stringify(createRequest) + "\n");
+      server.stdin.write(JSON.stringify(searchRequest) + "\n");
     }
-    // Handle the create response
-    else if (!ticketCreated && response.id === 2) {
-      ticketCreated = true;
+    // Handle the search response
+    else if (!ticketsRequested && response.id === 2) {
+      ticketsRequested = true;
       
       if (response.result?.content?.[0]?.text) {
         try {
-          const result = JSON.parse(response.result.content[0].text);
-          console.log(`✓ Ticket created successfully!\n`);
-          console.log(`========== TICKET DETAILS ==========`);
-          console.log(`Ticket ID: ${result.ID}`);
-          console.log(`Title: ${result.Title}`);
-          console.log(`Status: ${result.StatusName}`);
-          console.log(`Priority: ${result.PriorityName}`);
-          console.log(`Type: ${result.TypeName}`);
-          console.log(`Account: ${result.AccountName}`);
-          console.log(`Created: ${new Date(result.CreatedDate).toLocaleString()}`);
-          console.log(`====================================`);
+          const tickets = JSON.parse(response.result.content[0].text);
+          console.log(`Total open tickets found: ${tickets.length}`);
+          console.log(`\nAPI actually returned ${tickets.length} results (not limited to 50)`);
+          console.log(`\nThis means either:`);
+          console.log(`  - There are only ${tickets.length} open tickets in the system, OR`);
+          console.log(`  - The API has its own server-side limit`);
         } catch (e) {
           console.log(response.result.content[0].text);
         }
@@ -96,7 +95,7 @@ rl.on("line", (line) => {
       process.exit(0);
     }
   } catch (e) {
-    // Ignore JSON parse errors from server output
+    console.error("Error parsing response:", e.message);
   }
 });
 

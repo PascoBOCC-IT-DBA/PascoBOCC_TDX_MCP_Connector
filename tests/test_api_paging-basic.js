@@ -1,3 +1,9 @@
+/**
+ * Test: Basic API Pagination
+ * Description: Tests basic pagination mechanisms to explore offset/skip parameter support
+ *              in the TDX API for retrieving assets in batches.
+ */
+
 import { spawn } from "child_process";
 import { createInterface } from "readline";
 import { fileURLToPath } from "url";

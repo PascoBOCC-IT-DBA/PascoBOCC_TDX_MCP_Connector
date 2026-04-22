@@ -1,3 +1,10 @@
+/**
+ * Test: Asset Types Breakdown
+ * Description: Analyzes asset types based on manufacturer and model information.
+ *              Groups similar assets together and shows the count and examples for
+ *              the top 30 asset types in your system. Limited to first 500 assets.
+ */
+
 import { spawn } from "child_process";
 import { createInterface } from "readline";
 import { fileURLToPath } from "url";

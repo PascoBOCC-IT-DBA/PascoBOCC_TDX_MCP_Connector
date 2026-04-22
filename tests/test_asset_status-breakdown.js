@@ -1,3 +1,10 @@
+/**
+ * Test: Asset Status Breakdown
+ * Description: Groups all assets by their current status and provides counts for each status.
+ *              Useful for understanding asset lifecycle (In Use, Surplussed, Retired, etc.)
+ *              and managing assets across different operational states.
+ */
+
 import { spawn } from "child_process";
 import { createInterface } from "readline";
 import { fileURLToPath } from "url";
@@ -36,7 +43,7 @@ const initRequest = {
   },
 };
 
-console.log("Sending initialize request...");
+console.log("Fetching all open tickets to analyze status breakdown...\n");
 server.stdin.write(JSON.stringify(initRequest) + "\n");
 
 // Listen for responses
@@ -47,11 +54,9 @@ rl.on("line", (line) => {
   try {
     const response = JSON.parse(line);
     
-    // After initialization, search for open tickets with higher limit
+    // After initialization, search for all open tickets
     if (!initialized && response.id === 1) {
       initialized = true;
-      console.log("✓ Server initialized successfully!\n");
-      console.log("Searching for all open tickets (requesting 500 results)...\n");
 
       const searchRequest = {
         jsonrpc: "2.0",
@@ -61,7 +66,7 @@ rl.on("line", (line) => {
           name: "tdx-ticket-search",
           arguments: {
             statusIds: [894, 896, 3625], // New, In Process, Pending
-            maxResults: 500,
+            maxResults: 1000,
           },
         },
       };
@@ -74,11 +79,43 @@ rl.on("line", (line) => {
       if (response.result?.content?.[0]?.text) {
         try {
           const tickets = JSON.parse(response.result.content[0].text);
-          console.log(`Total open tickets found: ${tickets.length}`);
-          console.log(`\nAPI actually returned ${tickets.length} results (not limited to 50)`);
-          console.log(`\nThis means either:`);
-          console.log(`  - There are only ${tickets.length} open tickets in the system, OR`);
-          console.log(`  - The API has its own server-side limit`);
+          
+          // Group by status
+          const statusBreakdown = {};
+          tickets.forEach((ticket) => {
+            const statusName = ticket.StatusName;
+            if (!statusBreakdown[statusName]) {
+              statusBreakdown[statusName] = { count: 0, statusId: ticket.StatusID, examples: [] };
+            }
+            statusBreakdown[statusName].count++;
+            if (statusBreakdown[statusName].examples.length < 3) {
+              statusBreakdown[statusName].examples.push({
+                id: ticket.ID,
+                title: ticket.Title,
+                priority: ticket.PriorityName,
+              });
+            }
+          });
+          
+          console.log(`=== OPEN TICKETS STATUS BREAKDOWN ===\n`);
+          console.log(`Total Open Tickets: ${tickets.length}\n`);
+          
+          // Sort by count (descending)
+          const sorted = Object.entries(statusBreakdown).sort((a, b) => b[1].count - a[1].count);
+          
+          sorted.forEach(([statusName, data], index) => {
+            const percentage = ((data.count / tickets.length) * 100).toFixed(1);
+            console.log(`${index + 1}. ${statusName}`);
+            console.log(`   Count: ${data.count} (${percentage}%)`);
+            console.log(`   Status ID: ${data.statusId}`);
+            console.log(`   Examples:`);
+            data.examples.forEach((ex) => {
+              console.log(`     - #${ex.id}: ${ex.title.substring(0, 60)}... [${ex.priority}]`);
+            });
+            console.log();
+          });
+          
+          console.log(`=== END ===`);
         } catch (e) {
           console.log(response.result.content[0].text);
         }
@@ -89,7 +126,7 @@ rl.on("line", (line) => {
       process.exit(0);
     }
   } catch (e) {
-    console.error("Error parsing response:", e.message);
+    // Ignore JSON parse errors from server output
   }
 });
 

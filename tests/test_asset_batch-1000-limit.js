@@ -1,3 +1,9 @@
+/**
+ * Test: Asset Batch with 1000 Limit
+ * Description: Tests asset search with a 1000 result limit to verify that the API
+ *              respects the MaxResults parameter at this level.
+ */
+
 import { spawn } from "child_process";
 import { createInterface } from "readline";
 import { fileURLToPath } from "url";
@@ -7,21 +13,21 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const projectRoot = resolve(__dirname, "..");
 
-// Connect to the tdx-local MCP server via stdio
-const server = spawn("npm", ["start"], {
+// Start the MCP server as a subprocess
+const server = spawn("node", ["dist/index.js"], {
   cwd: projectRoot,
   stdio: ["pipe", "pipe", "pipe"],
-  shell: true,
 });
 
 const rl = createInterface({
   input: server.stdout,
+  output: server.stdin,
   terminal: false,
 });
 
 let messageId = 1;
 
-// Send initialization request
+// Send an initialization request
 const initRequest = {
   jsonrpc: "2.0",
   id: messageId++,
@@ -30,21 +36,24 @@ const initRequest = {
     protocolVersion: "2024-11-05",
     capabilities: {},
     clientInfo: {
-      name: "ticket-query",
+      name: "test-client",
       version: "1.0.0",
     },
   },
 };
 
+console.log("Testing API limit by requesting 1000 results...\n");
 server.stdin.write(JSON.stringify(initRequest) + "\n");
 
+// Listen for responses
 let initialized = false;
+let ticketsRequested = false;
 
 rl.on("line", (line) => {
   try {
     const response = JSON.parse(line);
-
-    // After initialization, query open tickets
+    
+    // After initialization, search for open tickets with 1000 limit
     if (!initialized && response.id === 1) {
       initialized = true;
 
@@ -56,61 +65,41 @@ rl.on("line", (line) => {
           name: "tdx-ticket-search",
           arguments: {
             statusIds: [894, 896, 3625], // New, In Process, Pending
-            maxResults: 5000,
+            maxResults: 1000,
           },
         },
       };
       server.stdin.write(JSON.stringify(searchRequest) + "\n");
     }
-    // Handle search response
-    else if (response.id === 2) {
+    // Handle the search response
+    else if (!ticketsRequested && response.id === 2) {
+      ticketsRequested = true;
+      
       if (response.result?.content?.[0]?.text) {
         try {
           const tickets = JSON.parse(response.result.content[0].text);
-          
-          // Summary by status
-          const byStatus = {};
-          tickets.forEach(ticket => {
-            if (!byStatus[ticket.StatusName]) {
-              byStatus[ticket.StatusName] = [];
-            }
-            byStatus[ticket.StatusName].push(ticket);
-          });
-
-          console.log(`\n📋 Total Open Tickets: ${tickets.length}\n`);
-          console.log("Summary by Status:");
-          Object.entries(byStatus).forEach(([status, items]) => {
-            console.log(`  • ${status}: ${items.length}`);
-          });
-          
-          console.log("\n\nFirst 15 Open Tickets:\n");
-          tickets.slice(0, 15).forEach((ticket, index) => {
-            console.log(`${(index + 1).toString().padStart(2)}. [${ticket.ID}] ${ticket.Title}`);
-            console.log(`    Status: ${ticket.StatusName} | Priority: ${ticket.PriorityName} | Account: ${ticket.AccountName}`);
-          });
-          
-          if (tickets.length > 15) {
-            console.log(`\n... and ${tickets.length - 15} more tickets`);
-          }
+          console.log(`Requested: 1000 results`);
+          console.log(`Returned: ${tickets.length} results`);
+          console.log(`\n→ The API appears to have a hard limit of ${tickets.length} results per query`);
         } catch (e) {
-          console.log("Response:", response.result.content[0].text);
+          console.log(response.result.content[0].text);
         }
       } else if (response.error) {
         console.log("Error:", response.error);
       }
-
+      
       process.exit(0);
     }
   } catch (e) {
-    // Ignore JSON parse errors from npm output
+    // Ignore JSON parse errors from server output
   }
 });
 
 server.stderr.on("data", (data) => {
-  // Ignore stderr noise from npm
+  console.error("Server error:", data.toString());
 });
 
 setTimeout(() => {
-  console.error("Timeout");
+  console.error("Timeout waiting for response");
   process.exit(1);
-}, 15000);
+}, 10000);

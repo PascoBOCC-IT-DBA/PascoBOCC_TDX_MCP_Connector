@@ -1,3 +1,9 @@
+/**
+ * Test: API Response Structure Validation
+ * Description: Validates the structure of TDX API responses and checks for paging metadata,
+ *              total counts, and other structural information.
+ */
+
 import { spawn } from "child_process";
 import { createInterface } from "readline";
 import { fileURLToPath } from "url";

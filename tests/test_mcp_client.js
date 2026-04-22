@@ -1,3 +1,10 @@
+/**
+ * Test: MCP Client Initialization
+ * Description: Tests the Model Context Protocol (MCP) server initialization and client
+ *              connection. Verifies that the MCP server starts correctly and can be
+ *              communicated with via JSON-RPC protocol.
+ */
+
 import { spawn } from "child_process";
 import { createInterface } from "readline";
 import { fileURLToPath } from "url";

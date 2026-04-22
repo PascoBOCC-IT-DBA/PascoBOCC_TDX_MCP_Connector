@@ -1,3 +1,9 @@
+/**
+ * Test: Count New Tickets
+ * Description: Retrieves and counts newly created tickets in your TDX system.
+ *              Useful for tracking the volume of new incoming requests.
+ */
+
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import { TdxAuth } from "../dist/auth.js";

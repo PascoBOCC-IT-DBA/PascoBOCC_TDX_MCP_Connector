@@ -1,3 +1,10 @@
+/**
+ * Test: Comprehensive Batch by Form and Status
+ * Description: Executes parallel batch searches for each Form × Status combination to
+ *              retrieve ALL assets in the system, bypassing the 10K result limit.
+ *              Results in 117 parallel requests (9 forms × 13 statuses).
+ */
+
 import { spawn } from "child_process";
 import { createInterface } from "readline";
 import { fileURLToPath } from "url";

@@ -1,3 +1,13 @@
+/**
+ * Test: Comprehensive Asset Inventory Report
+ * Description: Generates a detailed inventory report showing:
+ *              - Total asset count with breakdown by form and status
+ *              - Top 30 asset types by manufacturer and model
+ *              - Form × Status distribution matrix
+ *              - Statistical analysis and key insights
+ *              Uses the AssetBatcher utility to retrieve all 17K+ assets efficiently.
+ */
+
 import { fileURLToPath } from "url";
 import { dirname, resolve } from "path";
 import { TdxAuth } from "../dist/auth.js";

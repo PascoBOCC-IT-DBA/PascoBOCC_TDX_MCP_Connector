@@ -1,3 +1,9 @@
+/**
+ * Test: Paging Parameter Experiments
+ * Description: Experiments with different paging parameter names (PageIndex, offset, skip)
+ *              to determine which (if any) the TDX API supports.
+ */
+
 import { spawn } from "child_process";
 import { createInterface } from "readline";
 import { fileURLToPath } from "url";

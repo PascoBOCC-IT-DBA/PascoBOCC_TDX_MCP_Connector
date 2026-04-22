@@ -1,3 +1,10 @@
+/**
+ * Utility: Local TDX Client
+ * Description: Provides a local client utility for direct interaction with the TDX API.
+ *              Used by other test scripts to make authenticated requests and handle responses.
+ *              Manages TDX server startup and communication.
+ */
+
 import { spawn } from "child_process";
 import { createInterface } from "readline";
 import { fileURLToPath } from "url";

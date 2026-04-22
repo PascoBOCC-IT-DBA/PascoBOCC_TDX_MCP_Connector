@@ -1,3 +1,10 @@
+/**
+ * Test: Total Asset Count Verification
+ * Description: Verifies the total asset count by requesting high limits (5000-10000)
+ *              to determine if there are more assets beyond the typical 500 limit
+ *              and to identify if the API has a hard result limit.
+ */
+
 import { spawn } from "child_process";
 import { createInterface } from "readline";
 import { fileURLToPath } from "url";

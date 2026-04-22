@@ -1,3 +1,10 @@
+/**
+ * Test: Asset Data Structure Validation
+ * Description: Inspects the data structure and schema of individual asset objects
+ *              returned by the TDX API. Shows what properties are available on assets
+ *              and validates the response format.
+ */
+
 import { fileURLToPath } from "url";
 import { dirname, resolve } from "path";
 import { TdxAuth } from "./dist/auth.js";

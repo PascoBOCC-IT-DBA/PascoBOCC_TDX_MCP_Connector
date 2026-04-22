@@ -1,3 +1,11 @@
+/**
+ * Test: AssetBatcher Utility Demonstration
+ * Description: Demonstrates the three methods of the AssetBatcher utility:
+ *              1. getAllAssets() - Retrieves all assets across all forms and statuses
+ *              2. getAssetsByForm() - Retrieves all assets for a specific form
+ *              3. getAssetsByStatus() - Retrieves all assets with a specific status
+ */
+
 import { fileURLToPath } from "url";
 import { dirname, resolve } from "path";
 import { TdxAuth } from "../dist/auth.js";

@@ -1,3 +1,9 @@
+/**
+ * Test: Open Tickets Retrieval
+ * Description: Retrieves all open/active tickets from your TDX system.
+ *              Shows summary of currently open tickets that require attention.
+ */
+
 import { spawn } from "child_process";
 import { createInterface } from "readline";
 import { fileURLToPath } from "url";
@@ -41,72 +47,57 @@ server.stdin.write(JSON.stringify(initRequest) + "\n");
 
 // Listen for responses
 let initialized = false;
-let toolsListed = false;
-let statusesRequested = false;
+let ticketsRequested = false;
 
 rl.on("line", (line) => {
   try {
     const response = JSON.parse(line);
     
-    // After initialization, list available tools
+    // After initialization, search for open tickets
     if (!initialized && response.id === 1) {
       initialized = true;
-      console.log("\n✓ Server initialized successfully!");
-      console.log("\nListing available tools...");
+      console.log("✓ Server initialized successfully!\n");
+      console.log("Searching for open tickets (statusIds: 894=New, 896=In Process, 3625=Pending)...\n");
 
-      const listRequest = {
+      const searchRequest = {
         jsonrpc: "2.0",
         id: messageId++,
-        method: "tools/list",
-      };
-      server.stdin.write(JSON.stringify(listRequest) + "\n");
-    }
-    // After listing tools, find and call the statuses tool
-    else if (!toolsListed && response.id === 2 && response.result?.tools) {
-      toolsListed = true;
-      const statusesTool = response.result.tools.find(
-        (t) => t.name === "tdx-statuses-get"
-      );
-
-      if (statusesTool) {
-        console.log("✓ Found tdx-statuses-get tool!");
-        console.log("\nCalling tool: tdx-statuses-get with componentType='tickets'");
-
-        const callRequest = {
-          jsonrpc: "2.0",
-          id: messageId++,
-          method: "tools/call",
-          params: {
-            name: "tdx-statuses-get",
-            arguments: {
-              componentType: "tickets",
-            },
+        method: "tools/call",
+        params: {
+          name: "tdx-ticket-search",
+          arguments: {
+            statusIds: [894, 896, 3625], // New, In Process, Pending
+            maxResults: 50,
           },
-        };
-        server.stdin.write(JSON.stringify(callRequest) + "\n");
-      } else {
-        console.log("✗ tdx-statuses-get tool not found");
-        console.log("Available tools:", response.result.tools.map((t) => t.name));
-        process.exit(1);
-      }
+        },
+      };
+      server.stdin.write(JSON.stringify(searchRequest) + "\n");
     }
-    // Handle the statuses response
-    else if (!statusesRequested && response.id === 3) {
-      statusesRequested = true;
-      console.log("\n=== TICKET STATUSES ===\n");
+    // Handle the search response
+    else if (!ticketsRequested && response.id === 2) {
+      ticketsRequested = true;
       
       if (response.result?.content?.[0]?.text) {
         try {
-          const statuses = JSON.parse(response.result.content[0].text);
-          console.log(JSON.stringify(statuses, null, 2));
-        } catch {
+          const tickets = JSON.parse(response.result.content[0].text);
+          console.log(`Found ${tickets.length} open tickets:\n`);
+          
+          // Display tickets in a readable format
+          tickets.forEach((ticket, index) => {
+            console.log(`${index + 1}. ID: ${ticket.ID} | Title: ${ticket.Title}`);
+            console.log(`   Status: ${ticket.StatusName} | Priority: ${ticket.PriorityName}`);
+            console.log(`   Type: ${ticket.TypeName} | Account: ${ticket.AccountName}`);
+            console.log(`   Responsible: ${ticket.ResponsibleFullName} (${ticket.ResponsibleGroupName})`);
+            console.log(`   Created: ${new Date(ticket.CreatedDate).toLocaleDateString()}`);
+            console.log();
+          });
+        } catch (e) {
           console.log(response.result.content[0].text);
         }
       } else if (response.error) {
         console.log("Error:", response.error);
       }
       
-      console.log("\n=== END ===\n");
       process.exit(0);
     }
   } catch (e) {

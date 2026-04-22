@@ -1,3 +1,9 @@
+/**
+ * Test: Ticket Creation
+ * Description: Tests the ticket creation functionality by creating a new ticket
+ *              with sample data and verifying successful creation with response.
+ */
+
 import { spawn } from "child_process";
 import { createInterface } from "readline";
 import { fileURLToPath } from "url";
@@ -36,45 +42,56 @@ const initRequest = {
   },
 };
 
-console.log("Testing API limit by requesting 1000 results...\n");
+console.log("Creating a test service request ticket...\n");
 server.stdin.write(JSON.stringify(initRequest) + "\n");
 
 // Listen for responses
 let initialized = false;
-let ticketsRequested = false;
+let ticketCreated = false;
 
 rl.on("line", (line) => {
   try {
     const response = JSON.parse(line);
     
-    // After initialization, search for open tickets with 1000 limit
+    // After initialization, create a ticket
     if (!initialized && response.id === 1) {
       initialized = true;
 
-      const searchRequest = {
+      const createRequest = {
         jsonrpc: "2.0",
         id: messageId++,
         method: "tools/call",
         params: {
-          name: "tdx-ticket-search",
+          name: "tdx-ticket-create",
           arguments: {
-            statusIds: [894, 896, 3625], // New, In Process, Pending
-            maxResults: 1000,
+            typeId: 867, // "General" type
+            title: "Test Service Request - GitHub Copilot MCP Connector",
+            description: "This is a test ticket created by the MCP connector test script",
+            accountId: 2356, // Information Technology
+            priorityId: 329, // P3
+            statusId: 894, // New
           },
         },
       };
-      server.stdin.write(JSON.stringify(searchRequest) + "\n");
+      server.stdin.write(JSON.stringify(createRequest) + "\n");
     }
-    // Handle the search response
-    else if (!ticketsRequested && response.id === 2) {
-      ticketsRequested = true;
+    // Handle the create response
+    else if (!ticketCreated && response.id === 2) {
+      ticketCreated = true;
       
       if (response.result?.content?.[0]?.text) {
         try {
-          const tickets = JSON.parse(response.result.content[0].text);
-          console.log(`Requested: 1000 results`);
-          console.log(`Returned: ${tickets.length} results`);
-          console.log(`\n→ The API appears to have a hard limit of ${tickets.length} results per query`);
+          const result = JSON.parse(response.result.content[0].text);
+          console.log(`✓ Ticket created successfully!\n`);
+          console.log(`========== TICKET DETAILS ==========`);
+          console.log(`Ticket ID: ${result.ID}`);
+          console.log(`Title: ${result.Title}`);
+          console.log(`Status: ${result.StatusName}`);
+          console.log(`Priority: ${result.PriorityName}`);
+          console.log(`Type: ${result.TypeName}`);
+          console.log(`Account: ${result.AccountName}`);
+          console.log(`Created: ${new Date(result.CreatedDate).toLocaleString()}`);
+          console.log(`====================================`);
         } catch (e) {
           console.log(response.result.content[0].text);
         }

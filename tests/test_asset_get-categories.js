@@ -1,3 +1,9 @@
+/**
+ * Test: Get Asset Categories
+ * Description: Retrieves all active asset forms/categories available in your TDX system
+ *              using direct API calls. Shows form IDs, names, and metadata.
+ */
+
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import { TdxAuth } from "../dist/auth.js";

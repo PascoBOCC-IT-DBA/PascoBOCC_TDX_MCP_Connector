@@ -1,3 +1,9 @@
+/**
+ * Test: Count Assets by Form
+ * Description: Retrieves asset counts for each form type in your TDX system.
+ *              Shows which asset categories have the most assets and provides a summary.
+ */
+
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import { TdxAuth } from "../dist/auth.js";

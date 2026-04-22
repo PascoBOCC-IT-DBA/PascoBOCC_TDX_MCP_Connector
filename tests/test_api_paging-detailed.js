@@ -1,3 +1,9 @@
+/**
+ * Test: Detailed Pagination Analysis
+ * Description: Analyzes pagination structures and metadata in API responses to determine
+ *              if paging information is available in the response payload.
+ */
+
 import { spawn } from "child_process";
 import { createInterface } from "readline";
 import { fileURLToPath } from "url";

@@ -1,3 +1,10 @@
+/**
+ * Test: Batch Assets by Form
+ * Description: Retrieves all assets by batching searches across each asset form type.
+ *              Each form is searched separately with a 500 result limit to show breakdown
+ *              by asset category (Computer, Mobile Device, Radio, etc.).
+ */
+
 import { spawn } from "child_process";
 import { createInterface } from "readline";
 import { fileURLToPath } from "url";

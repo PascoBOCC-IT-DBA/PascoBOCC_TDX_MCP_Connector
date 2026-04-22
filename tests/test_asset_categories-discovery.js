@@ -1,3 +1,9 @@
+/**
+ * Test: Asset Categories Discovery
+ * Description: Discovers and lists all available asset categories/forms in your TDX system
+ *              by testing various API endpoints to find the correct endpoint for retrieving forms.
+ */
+
 import { fileURLToPath } from "url";
 import { dirname, resolve } from "path";
 import { TdxAuth } from "./dist/auth.js";

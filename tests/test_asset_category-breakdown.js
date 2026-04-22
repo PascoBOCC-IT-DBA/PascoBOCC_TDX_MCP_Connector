@@ -1,3 +1,10 @@
+/**
+ * Test: Asset Category Breakdown
+ * Description: Groups all assets by their category/form type and provides counts
+ *              and examples for each category. Shows the distribution of assets
+ *              across different asset types (Computer, Radio, Mobile Device, etc.).
+ */
+
 import { spawn } from "child_process";
 import { createInterface } from "readline";
 import { fileURLToPath } from "url";
