@@ -21,6 +21,10 @@ Write-Host ""
 Write-Host "You'll need your BEID and Web Services Key from"
 Write-Host "TDAdmin > Organization Details > API Settings."
 Write-Host ""
+Write-Host "Note: After setup, when you open or reload VS Code,"
+Write-Host "you'll be prompted to enter these credentials again."
+Write-Host "VS Code will cache them for the session."
+Write-Host ""
 
 # Check for Node.js
 $nodeVersion = $null
@@ -78,6 +82,13 @@ Write-Host ""
 $TdxAppId = Read-Host "TDX Application ID (integer)"
 if ([string]::IsNullOrWhiteSpace($TdxAppId)) {
     Write-Host "ERROR: App ID is required." -ForegroundColor Red
+    Read-Host "Press Enter to exit"
+    exit 1
+}
+
+# Validate App ID is numeric
+if (-not [int]::TryParse($TdxAppId, [ref]$null)) {
+    Write-Host "ERROR: App ID must be a valid integer." -ForegroundColor Red
     Read-Host "Press Enter to exit"
     exit 1
 }
@@ -144,38 +155,39 @@ $mcpConfig = @{
 $mcpConfig | ConvertTo-Json -Depth 10 | Set-Content $mcpConfigFile -Encoding UTF8
 Write-Host "Created .vscode/mcp.json"
 
-# Create .vscode/settings.json with input variable definitions
-$settingsFile = Join-Path $VscodeDir "settings.json"
-$existingSettings = @{}
-
-if (Test-Path $settingsFile) {
-    try {
-        $existingSettings = Get-Content $settingsFile -Raw | ConvertFrom-Json -AsHashtable
-    } catch {
-        $existingSettings = @{}
-    }
+# Create .vscode/launch.json with input variable definitions
+$launchFile = Join-Path $VscodeDir "launch.json"
+$launchConfig = @{
+    version = "0.2.0"
+    inputs = @(
+        @{
+            id = "tdxBaseUrl"
+            type = "promptString"
+            description = "TDX Web API Base URL (e.g., https://yourorg.teamdynamix.com/TDWebApi/api)"
+            default = "https://yourorg.teamdynamix.com/TDWebApi/api"
+        },
+        @{
+            id = "tdxBeid"
+            type = "promptString"
+            description = "TDX Admin BEID from TDAdmin > Organization Details > API Settings"
+            password = $false
+        },
+        @{
+            id = "tdxWebServicesKey"
+            type = "promptString"
+            description = "TDX Web Services Key from TDAdmin > Organization Details > API Settings"
+            password = $true
+        },
+        @{
+            id = "tdxAppId"
+            type = "promptString"
+            description = "Default TDX Application ID (integer)"
+        }
+    )
 }
 
-# Add input variable definitions (merge with existing if present)
-if (-not $existingSettings.ContainsKey('inputBox.input.variables')) {
-    $existingSettings['inputBox.input.variables'] = @{}
-}
-
-$existingSettings['inputBox.input.variables']['tdxBaseUrl'] = @{
-    description = "TDX Web API Base URL (e.g., https://yourorg.teamdynamix.com/TDWebApi/api)"
-}
-$existingSettings['inputBox.input.variables']['tdxBeid'] = @{
-    description = "TDX Admin BEID from TDAdmin > Organization Details > API Settings"
-}
-$existingSettings['inputBox.input.variables']['tdxWebServicesKey'] = @{
-    description = "TDX Web Services Key from TDAdmin > Organization Details > API Settings"
-}
-$existingSettings['inputBox.input.variables']['tdxAppId'] = @{
-    description = "Default TDX Application ID (integer)"
-}
-
-$existingSettings | ConvertTo-Json -Depth 10 | Set-Content $settingsFile -Encoding UTF8
-Write-Host "Updated .vscode/settings.json"
+$launchConfig | ConvertTo-Json -Depth 10 | Set-Content $launchFile -Encoding UTF8
+Write-Host "Created .vscode/launch.json"
 
 Write-Host ""
 Write-Host "=============================================="
@@ -185,20 +197,32 @@ Write-Host ""
 Write-Host "The TDX MCP server has been configured for GitHub Copilot Chat."
 Write-Host ""
 Write-Host "Next steps:"
-Write-Host "  1. Open VS Code in this workspace"
+Write-Host "  1. Close and reopen VS Code (or reload the window)"
 Write-Host "  2. When prompted, provide your TDX credentials:"
 Write-Host "     - TDX Base URL"
-Write-Host "     - TDX BEID"
+Write-Host "     - TDX Admin BEID"
 Write-Host "     - TDX Web Services Key"
 Write-Host "     - TDX App ID"
-Write-Host "  3. Open Copilot Chat (Ctrl+Shift+I)"
-Write-Host "  4. The TDX tools will be available automatically"
+Write-Host "  3. Verify the MCP server is running:"
+Write-Host "     - Press Ctrl+Shift+P and run 'MCP: List Servers'"
+Write-Host "  4. Open Copilot Chat (Ctrl+Shift+I or Ctrl+L)"
+Write-Host "  5. The TDX tools will be available automatically"
 Write-Host ""
-Write-Host "You can now use commands like:"
+Write-Host "Example prompts to try:"
 Write-Host "  - 'Search for open tickets assigned to me'"
 Write-Host "  - 'Look up person john.doe@example.com'"
 Write-Host "  - 'Get ticket #12345'"
 Write-Host "  - 'Search the knowledge base for VPN setup'"
 Write-Host "  - 'Find all assets in the IT department'"
+Write-Host ""
+Write-Host "Configuration files created:"
+Write-Host "  - .vscode/mcp.json (MCP server configuration)"
+Write-Host "  - .vscode/launch.json (input variable prompts)"
+Write-Host ""
+Write-Host "Troubleshooting:"
+Write-Host "  - If MCP server doesn't start, check the VS Code Output panel"
+Write-Host "  - Ensure Node.js and npm are in your PATH"
+Write-Host "  - Try 'npm run build' from a terminal to check for build errors"
+Write-Host "  - Verify your TDX credentials are correct"
 Write-Host ""
 Read-Host "Press Enter to exit"
