@@ -246,6 +246,3 @@ TDX-MCP/
       attributes.ts        # 1 custom attributes tool
 ```
 
----
-
-Created by [University of Montana IT](https://www.umt.edu/it/)
