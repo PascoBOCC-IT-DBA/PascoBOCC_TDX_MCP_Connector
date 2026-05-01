@@ -177,6 +177,10 @@ function displayResults() {
       `   Created: ${new Date(t1.CreatedDate).toLocaleDateString()}`
     );
 
+    if (t1.webLink) {
+      console.log(`   🔗 WebLink: ${t1.webLink}`);
+    }
+
     if (t1.Description) {
       const desc = t1.Description.replace(/<[^>]*>/g, "");
       console.log(`\n   Description:\n   ${desc}\n`);
@@ -208,6 +212,10 @@ function displayResults() {
     console.log(
       `   Created: ${new Date(t2.CreatedDate).toLocaleDateString()}`
     );
+
+    if (t2.webLink) {
+      console.log(`   🔗 WebLink: ${t2.webLink}`);
+    }
 
     if (t2.Description) {
       const desc = t2.Description.replace(/<[^>]*>/g, "");

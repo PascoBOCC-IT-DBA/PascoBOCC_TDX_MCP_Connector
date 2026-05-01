@@ -148,6 +148,9 @@ function displayResults() {
         console.log(
           `    Status: ${ticket.StatusName} | Priority: ${ticket.PriorityName}`
         );
+        if (ticket.webLink) {
+          console.log(`    🔗 WebLink: ${ticket.webLink}`);
+        }
         if (ticket.Description) {
           const desc = ticket.Description.replace(/<[^>]*>/g, "").substring(0, 100);
           console.log(`    Description: ${desc}...`);
