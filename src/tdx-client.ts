@@ -73,4 +73,16 @@ export class TdxClient {
   delete(path: string) {
     return this.request("DELETE", path);
   }
+
+  /**
+   * Generate a TDNext web URL for a ticket
+   * Pattern: https://{domain}/TDNext/Apps/{appId}/Tickets/TicketDet?TicketID={ticketId}
+   */
+  getTicketWebLink(ticketId: number, appId?: number): string {
+    const app = appId ?? this.appId;
+    // Extract domain from baseUrl (e.g., "https://service.pascocountyfl.net/TDWebApi/api" -> "https://service.pascocountyfl.net")
+    const urlObj = new URL(this.baseUrl);
+    const domain = `${urlObj.protocol}//${urlObj.hostname}${urlObj.port ? ':' + urlObj.port : ''}`;
+    return `${domain}/TDNext/Apps/${app}/Tickets/TicketDet?TicketID=${ticketId}`;
+  }
 }

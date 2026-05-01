@@ -68,7 +68,9 @@ export function registerTicketTools(server: McpServer, client: TdxClient) {
       const app = params.appId ?? defaultAppId;
       try {
         const result = await client.get(`/${app}/tickets/${params.id}`);
-        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        const ticket = typeof result === 'object' && result !== null ? result as Record<string, unknown> : {};
+        ticket.webLink = client.getTicketWebLink(params.id, app);
+        return { content: [{ type: "text", text: JSON.stringify(ticket, null, 2) }] };
       } catch (e: unknown) {
         return { content: [{ type: "text", text: String(e) }], isError: true };
       }
@@ -142,6 +144,14 @@ export function registerTicketTools(server: McpServer, client: TdxClient) {
       if (params.maxResults !== undefined) body.MaxResults = params.maxResults;
       try {
         const result = await client.post(`/${app}/tickets/search`, body);
+        // Add webLinks to each ticket in the results
+        if (Array.isArray(result)) {
+          result.forEach((ticket) => {
+            if (typeof ticket === 'object' && ticket !== null && 'ID' in ticket) {
+              (ticket as Record<string, unknown>).webLink = client.getTicketWebLink((ticket as Record<string, unknown>).ID as number, app);
+            }
+          });
+        }
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
         return { content: [{ type: "text", text: String(e) }], isError: true };
