@@ -6,7 +6,7 @@ This server exposes **43 tools** across **10 domains** — tickets, assets, CMDB
 
 ## Quick Start
 
-### Setup
+### Local Development Setup
 
 1. **Install dependencies and build**
    ```bash
@@ -14,11 +14,10 @@ This server exposes **43 tools** across **10 domains** — tickets, assets, CMDB
    npm run build
    ```
 
-2. **On Windows**: Run `setup-windows.ps1` to automate configuration
-   - Right-click → "Run with PowerShell"
-   - Follow prompts to enter TDX credentials
+2. **Configure environment variables** (see [Environment Variables](#environment-variables) below)
+   - Copy `.env.example` to `.env` and add your TDX credentials
 
-3. **Configure GitHub Copilot Chat** (see [GitHub Copilot Chat Setup](#github-copilot-chat-setup) below)
+3. **For production deployment**, see [DEPLOYMENT_UBUNTU.md](DEPLOYMENT_UBUNTU.md) for Ubuntu server setup and [COPILOT_INTEGRATION.md](COPILOT_INTEGRATION.md) for Copilot Studio integration
 
 ## Authentication
 
@@ -144,68 +143,35 @@ These tools do not require an `appId`.
 
 Common `componentId` values for `tdx-attributes-get`: `9` = Ticket, `27` = Asset, `63` = CI, `39` = KB Article, `2` = Project.
 
-## GitHub Copilot Chat Setup
+## Deployment
 
-GitHub Copilot Chat integrates MCP servers via VS Code's built-in MCP support.
+### Production (Ubuntu Server)
 
-### Automatic Setup (Windows)
+For deploying as a persistent HTTP service with API key authentication:
 
-Run `setup-windows.ps1` to automatically configure `.vscode/mcp.json` for you.
+1. See [DEPLOYMENT_UBUNTU.md](DEPLOYMENT_UBUNTU.md) for Ubuntu server setup
+2. See [COPILOT_INTEGRATION.md](COPILOT_INTEGRATION.md) for Copilot Studio integration
 
-### Manual Setup
+The HTTP wrapper (`src/http-wrapper.js`) spawns MCP server processes on-demand and exposes them via REST endpoints, allowing:
+- Persistent service with systemd auto-restart
+- API key authentication support
+- Integration with Microsoft Copilot Studio
+- Process pooling for efficiency
 
-1. **Build the server**
-   ```bash
-   npm install
-   npm run build
-   ```
+### Local Development (Stdio Mode)
 
-2. **Create/update `.vscode/mcp.json`** in your workspace:
-   ```json
-   {
-     "servers": {
-       "tdx": {
-         "type": "stdio",
-         "command": "node",
-         "args": ["${workspaceFolder}/dist/index.js"],
-         "env": {
-           "TDX_BASE_URL": "${input:tdxBaseUrl}",
-           "TDX_BEID": "${input:tdxBeid}",
-           "TDX_WEB_SERVICES_KEY": "${input:tdxWebServicesKey}",
-           "TDX_APP_ID": "${input:tdxAppId}"
-         }
-       }
-     }
-   }
-   ```
+For local development, build and run directly:
 
-3. **Add input variable prompts to `.vscode/settings.json`**:
-   ```json
-   {
-     "inputBox.input.variables": {
-       "tdxBaseUrl": {
-         "description": "TDX Web API Base URL (e.g., https://yourorg.teamdynamix.com/TDWebApi/api)"
-       },
-       "tdxBeid": {
-         "description": "TDX Admin BEID from TDAdmin > Organization Details > API Settings"
-       },
-       "tdxWebServicesKey": {
-         "description": "TDX Web Services Key from TDAdmin > Organization Details > API Settings"
-       },
-       "tdxAppId": {
-         "description": "Default TDX Application ID (integer)"
-       }
-     }
-   }
-   ```
+```bash
+npm run build
+npm start
+```
 
-4. **Start using the tools in GitHub Copilot Chat**:
-   - Press `Ctrl+Shift+P` and run `MCP: List Servers` to verify the server is running
-   - Use natural language prompts in Copilot Chat and the TDX tools will be available
+The stdio server will be available for integration with VS Code, Cline, or other MCP clients.
 
 ## Example Usage
 
-Once configured, you can use natural language in GitHub Copilot Chat:
+With the TDX MCP tools available, you can ask:
 
 - "Search for open tickets assigned to me"
 - "Get ticket #12345 and show me the comments"

@@ -16,6 +16,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const PORT = process.env.MCP_HTTP_PORT || 3000;
+const API_KEY = process.env.MCP_API_KEY || null; // Set to require API key auth
 const MCPscriptPath = join(__dirname, 'index.js');
 
 class MCPServerPool {
@@ -81,7 +82,19 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Health check endpoint
+  // API Key authentication (if configured)
+  if (API_KEY && req.url !== '/health') {
+    const authHeader = req.headers.authorization || '';
+    const providedKey = authHeader.replace('Bearer ', '').trim();
+    
+    if (!providedKey || providedKey !== API_KEY) {
+      res.writeHead(401);
+      res.end(JSON.stringify({ error: 'Unauthorized: Invalid or missing API key' }));
+      return;
+    }
+  }
+
+  // Health check endpoint (no auth required)
   if (req.url === '/health' && req.method === 'GET') {
     res.writeHead(200);
     res.end(JSON.stringify({ 
@@ -253,6 +266,7 @@ function handleMcpRequest(message, res) {
 // Start HTTP server
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`[HTTP Server] MCP HTTP Wrapper started on port ${PORT}`);
+  console.log(`[HTTP Server] API Key Required: ${API_KEY ? 'YES' : 'NO'}`);
   console.log(`[HTTP Server] Health check: http://localhost:${PORT}/health`);
   console.log(`[HTTP Server] Status: http://localhost:${PORT}/status`);
   console.log(`[HTTP Server] MCP endpoint: http://localhost:${PORT}/mcp`);

@@ -2,6 +2,7 @@
 
 ## Status
 ✅ **Server is running and ready for Copilot Studio integration**
+🔐 **API Key Authentication: ACTIVE** (All endpoints except `/health` require authentication)
 
 ## Service Details
 - **Status**: Active (running)
@@ -82,6 +83,88 @@ Content-Type: application/json
   }
 }
 ```
+
+## API Key Authentication
+
+### Current Configuration
+✅ **API Key is ACTIVE and deployed**
+
+**Your API Key:**
+```
+226ee1edd38aea72c27c62e44d0d4edb101a97922568db6db77036f83fbcebde
+```
+
+**Protected Endpoints** (require API key):
+- `GET /status`
+- `GET /tools`
+- `POST /mcp`
+
+**Public Endpoints** (no authentication):
+- `GET /health` (for load balancers and health checks)
+
+### To Change the API Key
+If you need to update or change the API key:
+
+1. **Update the service file:**
+```bash
+ssh itmcp@10.210.1.38 "sudo nano /etc/systemd/system/tdx-mcp.service"
+```
+
+2. **Find and update this line in the `[Service]` section:**
+```ini
+Environment="MCP_API_KEY=your-new-key-here"
+```
+
+3. **Restart the service:**
+```bash
+ssh itmcp@10.210.1.38 "sudo systemctl daemon-reload && sudo systemctl restart tdx-mcp"
+```
+
+### Use API Key in Requests
+
+Once enabled, all authenticated endpoints require the API key in the `Authorization` header:
+
+**With curl:**
+```bash
+curl -H "Authorization: Bearer 226ee1edd38aea72c27c62e44d0d4edb101a97922568db6db77036f83fbcebde" \
+  http://10.210.1.38:3000/status
+```
+
+**In Copilot Studio:**
+Add this header to all authenticated requests:
+```
+Authorization: Bearer 226ee1edd38aea72c27c62e44d0d4edb101a97922568db6db77036f83fbcebde
+```
+
+**Example MCP request with API key:**
+```
+POST http://10.210.1.38:3000/mcp
+Content-Type: application/json
+Authorization: Bearer 226ee1edd38aea72c27c62e44d0d4edb101a97922568db6db77036f83fbcebde
+
+{
+  "method": "tickets_query",
+  "params": {
+    "query": "status:open"
+  }
+}
+```
+
+### Generate a New API Key
+
+If you need to generate a new secure API key for rotation or security reasons:
+
+**On Ubuntu:**
+```bash
+openssl rand -hex 32
+```
+
+**Example output:**
+```
+a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6
+```
+
+Then update your service file with the new key (see "To Change the API Key" section above).
 
 ## Copilot Studio Configuration
 
@@ -194,14 +277,16 @@ ssh itmcp@10.210.1.38 "sudo systemctl restart tdx-mcp && sleep 2 && curl http://
 
 Available environment variables:
 - `MCP_HTTP_PORT` - HTTP server port (default: 3000)
+- `MCP_API_KEY` - API key for request authentication (optional, if set all endpoints except /health require this key)
 - `NODE_ENV` - Set to "production" for the service
 
 ## Next Steps
 
-1. **Configure Copilot Studio** with the HTTP endpoints
-2. **Test connectivity** from Copilot to the MCP service
-3. **Create agent actions** for each tool you need
-4. **Configure authentication** if required for the TDX API
+1. ✅ **API Key Authentication** - Already configured and active
+2. **Configure Copilot Studio** with the HTTP endpoints (see Copilot Studio Configuration section above)
+3. **Test connectivity** from Copilot to the MCP service using the API key
+4. **Create agent actions** for each tool you need
+5. **Test tool invocations** end-to-end from Copilot Studio
 
 ## Support
 
