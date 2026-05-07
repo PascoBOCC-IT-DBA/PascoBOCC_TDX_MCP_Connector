@@ -89,30 +89,34 @@ sudo chown tdx-mcp:tdx-mcp /opt/tdx-mcp/.env
 sudo chmod 600 /opt/tdx-mcp/.env
 ```
 
-### Step 6: Create Systemd Service
+### Step 6: Create Systemd Service (HTTP Wrapper Mode)
 ```bash
-# Create service file
+# Create service file for HTTP wrapper (persistent service mode)
 sudo tee /etc/systemd/system/tdx-mcp.service > /dev/null << 'EOF'
 [Unit]
-Description=TDX MCP Connector Server
+Description=TDX MCP HTTP Server
 After=network.target
 
 [Service]
 Type=simple
 User=tdx-mcp
 WorkingDirectory=/opt/tdx-mcp
-ExecStart=/usr/bin/node /opt/tdx-mcp/dist/index.js
+Environment="NODE_ENV=production"
+Environment="MCP_HTTP_PORT=3000"
+Environment="MCP_API_KEY=your-secure-api-key-here"
+ExecStart=/usr/bin/node /opt/tdx-mcp/src/http-wrapper.js
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=tdx-mcp
-Environment="NODE_ENV=production"
 
 [Install]
 WantedBy=multi-user.target
 EOF
 ```
+
+**Important**: Replace `your-secure-api-key-here` with a strong API key (see COPILOT_INTEGRATION.md for key generation).
 
 ### Step 7: Enable and Start Service
 ```bash
@@ -161,6 +165,52 @@ sudo systemctl stop tdx-mcp
 sudo systemctl cat tdx-mcp
 ```
 
+## High Availability & Auto-Restart
+
+The TDX MCP service is configured for automatic restart on both failure and server reboot.
+
+### Auto-Restart on Failure
+- **Enabled via**: `Restart=on-failure` in systemd service file
+- **Behavior**: If the service crashes or exits unexpectedly, systemd will automatically restart it
+- **Delay**: 10-second delay between restart attempts (`RestartSec=10`)
+- **Benefit**: Transient errors won't require manual intervention
+
+### Auto-Start on Server Reboot
+- **Enabled via**: `WantedBy=multi-user.target` in systemd service file AND `systemctl enable tdx-mcp`
+- **Behavior**: When the Ubuntu server reboots, the service will automatically start
+- **Timing**: Service starts after network is available (`After=network.target`)
+- **Benefit**: Zero-downtime server maintenance and automated recovery
+
+### Verify Auto-Start Configuration
+```bash
+# Check if service is enabled (should return "enabled")
+sudo systemctl is-enabled tdx-mcp
+
+# View the service dependencies and status
+sudo systemctl list-dependencies --all | grep tdx-mcp
+```
+
+### Enable Auto-Start (if needed)
+```bash
+# Enable the service for auto-start on boot
+sudo systemctl enable tdx-mcp
+
+# Verify it's enabled
+sudo systemctl is-enabled tdx-mcp
+```
+
+### Disable Auto-Start (if needed)
+```bash
+# If you need to prevent auto-start (e.g., for maintenance)
+sudo systemctl disable tdx-mcp
+
+# Verify it's disabled
+sudo systemctl is-enabled tdx-mcp  # Should return "disabled"
+
+# You can still start it manually
+sudo systemctl start tdx-mcp
+```
+
 ## Troubleshooting
 
 ### Service Won't Start
@@ -171,8 +221,11 @@ sudo journalctl -u tdx-mcp -n 100
 # Verify .env file exists and has correct permissions
 ls -la /opt/tdx-mcp/.env
 
+# Verify the HTTP wrapper file exists
+ls -la /opt/tdx-mcp/src/http-wrapper.js
+
 # Test Node.js manually
-sudo -u tdx-mcp /usr/bin/node /opt/tdx-mcp/dist/index.js
+sudo -u tdx-mcp /usr/bin/node /opt/tdx-mcp/src/http-wrapper.js
 ```
 
 ### Permission Denied Errors
@@ -220,6 +273,9 @@ sudo systemctl status tdx-mcp
 
 - Service runs as non-root user `tdx-mcp` for security
 - Logs are managed by journald (systemd logging)
-- Service will auto-restart if it crashes (with 10-second delay)
+- **Auto-restart enabled**: Service will automatically restart if it crashes (with 10-second delay)
+- **Auto-start enabled**: Service will automatically start on server reboot
+- **HTTP wrapper mode**: Service runs as HTTP wrapper (`src/http-wrapper.js`) for persistent availability, not stdio mode
 - Node.js 22 LTS is specified for long-term stability
 - .env file contains sensitive credentials - keep permissions restricted (600)
+- API key authentication is configured via `MCP_API_KEY` environment variable in the systemd service file

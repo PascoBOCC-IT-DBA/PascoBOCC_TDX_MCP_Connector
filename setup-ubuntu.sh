@@ -72,24 +72,32 @@ else
     echo -e "${GREEN}.env file found${NC}"
 fi
 
-# Step 8: Create systemd service file
-echo -e "${YELLOW}Step 8: Creating systemd service...${NC}"
+# Step 8: Create systemd service file (HTTP Wrapper Mode)
+echo -e "${YELLOW}Step 8: Creating systemd service (HTTP Wrapper mode)...${NC}"
+
+# Generate API key
+API_KEY=$(openssl rand -hex 32)
+echo -e "${YELLOW}Generated API Key: ${GREEN}$API_KEY${NC}"
+echo -e "${YELLOW}Save this key - you'll need it for Copilot Studio configuration${NC}\n"
+
 cat > /etc/systemd/system/${SERVICE_NAME}.service << EOF
 [Unit]
-Description=TDX MCP Connector Server
+Description=TDX MCP HTTP Server
 After=network.target
 
 [Service]
 Type=simple
 User=$SERVICE_USER
 WorkingDirectory=$PROJECT_DIR
-ExecStart=/usr/bin/node $PROJECT_DIR/dist/index.js
+Environment="NODE_ENV=production"
+Environment="MCP_HTTP_PORT=3000"
+Environment="MCP_API_KEY=$API_KEY"
+ExecStart=/usr/bin/node $PROJECT_DIR/src/http-wrapper.js
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=$SERVICE_NAME
-Environment="NODE_ENV=production"
 
 [Install]
 WantedBy=multi-user.target
@@ -101,11 +109,23 @@ chmod 644 /etc/systemd/system/${SERVICE_NAME}.service
 # Reload systemd
 systemctl daemon-reload
 
+# Step 9: Enable auto-start on boot
+echo -e "${YELLOW}Step 9: Enabling auto-start on boot...${NC}"
+systemctl enable ${SERVICE_NAME}
+echo -e "${GREEN}Service enabled for auto-start${NC}"
+
 echo -e "${GREEN}=== Setup Complete ===${NC}\n"
+echo -e "${GREEN}✅ Service is configured and enabled for auto-start${NC}\n"
 echo -e "${GREEN}Next steps:${NC}"
 echo "1. Copy your project files to: $PROJECT_DIR"
-echo "2. Copy your .env file to: $PROJECT_DIR/.env"
+echo "2. Copy your .env file to: $PROJECT_DIR/.env (chmod 600 for security)"
 echo "3. Run: sudo systemctl start $SERVICE_NAME"
 echo "4. Check status: sudo systemctl status $SERVICE_NAME"
 echo "5. View logs: sudo journalctl -u $SERVICE_NAME -f"
-echo "6. Enable auto-start: sudo systemctl enable $SERVICE_NAME"
+echo "6. Test HTTP endpoint: curl http://localhost:3000/health\n"
+echo -e "${GREEN}API Configuration:${NC}"
+echo "- HTTP Port: 3000"
+echo "- API Key: $API_KEY"
+echo "- Save this API key for Copilot Studio configuration!"
+echo "- Public endpoint (no auth): http://<server>:3000/health"
+echo "- Protected endpoints (require API key): /status, /tools, /mcp"
