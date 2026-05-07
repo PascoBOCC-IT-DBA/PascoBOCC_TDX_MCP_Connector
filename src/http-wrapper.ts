@@ -268,6 +268,7 @@ class MCPSession {
   pendingRequests: Map<number, any>;
   sseClients: any[] = [];
   messageQueue: any[] = [];
+  responseHandlers: any[] = [];
   outputBuffer: string = '';
   lastRequest: any = null;
 
@@ -280,6 +281,7 @@ class MCPSession {
     this.messageQueue = [];
     this.outputBuffer = '';
     this.lastRequest = null;
+    this.responseHandlers = [];
   }
 
   initialize() {
@@ -388,6 +390,25 @@ class MCPSession {
   handleMCPResponse(message) {
     console.log(`[MCP Session] Received response with id: ${message.id}`);
     
+    // Check if any HTTP handlers are waiting for this response
+    // (only if this message has an id - notifications don't have responses)
+    if (message.id && this.responseHandlers && this.responseHandlers.length > 0) {
+      const matched = this.responseHandlers.find(handler => {
+        try {
+          return handler(message);
+        } catch (err) {
+          console.error('[MCP Session] Error in response handler:', err.message);
+          return false;
+        }
+      });
+      
+      if (matched) {
+        console.log(`[MCP Session] Response matched HTTP handler for id ${message.id}`);
+        // Don't broadcast to SSE if HTTP handler claimed it
+        return;
+      }
+    }
+    
     // Check if this is a control message (initialize, tools/list, notifications)
     // vs a tool call result
     const isControlMessage = !message.result?.content || 
@@ -429,6 +450,7 @@ class MCPSession {
     this.sseClients = this.sseClients.filter(res => !res.destroyed);
     
     console.log(`[MCP Session] Broadcasting to ${this.sseClients.length} SSE clients for session ${this.sessionId}`);
+    console.log(`[MCP Session] Message to broadcast:`, JSON.stringify(message).substring(0, 200));
     
     if (this.sseClients.length === 0) {
       console.log(`[MCP Session] No active SSE clients, queuing message for ${this.sessionId}`);
@@ -436,8 +458,9 @@ class MCPSession {
     } else {
       this.sseClients.forEach((res, idx) => {
         try {
-          res.write(`data: ${JSON.stringify(message)}\n\n`);
-          console.log(`[MCP Session] Sent response to SSE client ${idx + 1}/${this.sseClients.length}`);
+          const sseData = `data: ${JSON.stringify(message)}\n\n`;
+          res.write(sseData);
+          console.log(`[MCP Session] Sent response to SSE client ${idx + 1}/${this.sseClients.length}, length: ${sseData.length} bytes`);
         } catch (err) {
           console.error(`[MCP Session] Error writing to SSE client: ${err.message}`);
         }
@@ -608,15 +631,74 @@ function handleMCPHTTPRequest(req, res) {
   req.on('end', () => {
     try {
       const message = JSON.parse(body);
+      console.log(`[MCP HTTP] Received POST request with id: ${message.id}, method: ${message.method}`);
+      
       const session = getOrCreateSession(sessionId);
+      
+      // Check if this is a notification (no id) or a request (has id)
+      if (!message.id) {
+        console.log(`[MCP HTTP] Notification received (no id), sending without waiting for response`);
+        // Notifications don't expect responses
+        session.sendRequest(message);
+        
+        res.setHeader('Content-Type', 'application/json');
+        res.writeHead(202); // Accepted
+        res.end(JSON.stringify({ accepted: true, sessionId }));
+        return;
+      }
+      
+      // Set up response collection for this specific request
+      let responseReceived = false;
+      let responseData = null;
+      
+      const responseHandler = (msgToCheck) => {
+        // Check if this is the response to our request
+        if (msgToCheck.id === message.id) {
+          responseReceived = true;
+          responseData = msgToCheck;
+          return true;
+        }
+        return false;
+      };
+      
+      // Register a temporary response handler
+      session.responseHandlers = session.responseHandlers || [];
+      session.responseHandlers.push(responseHandler);
       
       // Send to MCP server
       session.sendRequest(message);
       
-      // Send acknowledgement
-      res.setHeader('Content-Type', 'application/json');
-      res.writeHead(202); // Accepted
-      res.end(JSON.stringify({ accepted: true, sessionId }));
+      // Set a timeout to wait for response (30 seconds)
+      const timeout = setTimeout(() => {
+        if (!responseReceived) {
+          console.error(`[MCP HTTP] Timeout waiting for response to request id ${message.id}`);
+          // Remove handler
+          session.responseHandlers = session.responseHandlers.filter(h => h !== responseHandler);
+          
+          if (!res.headersSent) {
+            res.setHeader('Content-Type', 'application/json');
+            res.writeHead(504);
+            res.end(JSON.stringify({ error: 'Request timeout', id: message.id }));
+          }
+        }
+      }, 30000);
+      
+      // Poll for response
+      const pollInterval = setInterval(() => {
+        if (responseReceived) {
+          clearInterval(pollInterval);
+          clearTimeout(timeout);
+          
+          // Remove handler
+          session.responseHandlers = session.responseHandlers.filter(h => h !== responseHandler);
+          
+          console.log(`[MCP HTTP] Returning response to request id ${message.id}`);
+          res.setHeader('Content-Type', 'application/json');
+          res.writeHead(200);
+          res.end(JSON.stringify(responseData));
+        }
+      }, 50); // Poll every 50ms
+      
     } catch (err) {
       console.error('[MCP HTTP] JSON parse error:', err.message);
       res.setHeader('Content-Type', 'application/json');
