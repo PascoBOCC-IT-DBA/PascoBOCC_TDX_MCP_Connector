@@ -11,34 +11,111 @@ import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { EventEmitter } from 'events';
+import dotenv from 'dotenv';
+
+// Load environment variables from .env file
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const PORT = process.env.MCP_HTTP_PORT || 3000;
 const API_KEY = process.env.MCP_API_KEY || null; // Set to require API key auth
-const MCPscriptPath = join(__dirname, 'index.js');
+const MCPscriptPath = join(__dirname, '..', 'dist', 'index.js');
 
 class MCPServerPool {
   constructor() {
-    this.processes = [];
+    this.availableProcesses = [];
+    this.warmingProcesses = [];
     this.maxProcesses = 5;
+    this.minWarmProcesses = 2;
+  }
+
+  async spawnProcess() {
+    return new Promise((resolve) => {
+      console.log(`[MCP Pool] Spawning new MCP process`);
+      const proc = spawn('node', [MCPscriptPath], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: {
+          ...process.env,
+          NODE_ENV: 'production',
+          TDX_BASE_URL: process.env.TDX_BASE_URL,
+          TDX_BEID: process.env.TDX_BEID,
+          TDX_WEB_SERVICES_KEY: process.env.TDX_WEB_SERVICES_KEY,
+          TDX_APP_ID: process.env.TDX_APP_ID
+        }
+      });
+
+      let readyReceived = false;
+
+      proc.on('error', (err) => {
+        console.error('[MCP Pool] Process error:', err);
+        resolve(null);
+      });
+
+      // Wait for first output indicating process is ready
+      const onData = () => {
+        if (!readyReceived) {
+          readyReceived = true;
+          proc.stdout.removeListener('data', onData);
+          console.log(`[MCP Pool] Process ready (PID: ${proc.pid})`);
+          resolve(proc);
+        }
+      };
+
+      // Set timeout - if process doesn't respond within 30 seconds, return anyway
+      const timeout = setTimeout(() => {
+        if (!readyReceived) {
+          readyReceived = true;
+          proc.stdout.removeListener('data', onData);
+          console.log(`[MCP Pool] Process timeout (PID: ${proc.pid}), using anyway`);
+          resolve(proc);
+        }
+      }, 30000);
+
+      proc.stdout.on('data', onData);
+    });
+  }
+
+  async warmup() {
+    while (this.availableProcesses.length < this.minWarmProcesses && 
+           this.warmingProcesses.length + this.availableProcesses.length < this.maxProcesses) {
+      const warmupPromise = (async () => {
+        const proc = await this.spawnProcess();
+        if (proc && !proc.killed) {
+          this.availableProcesses.push(proc);
+        }
+        this.warmingProcesses = this.warmingProcesses.filter(p => p !== warmupPromise);
+      })();
+      this.warmingProcesses.push(warmupPromise);
+    }
   }
 
   getProcess() {
     // Return existing process if available
-    if (this.processes.length > 0) {
-      const proc = this.processes.pop();
-      if (proc && !proc.killed) {
-        return proc;
-      }
+    if (this.availableProcesses.length > 0) {
+      return this.availableProcesses.pop();
     }
 
-    // Create new process
-    console.log(`[MCP Pool] Creating new MCP process (${this.processes.length}/${this.maxProcesses})`);
+    // Spawn new process immediately (synchronously, but will complete in background)
+    console.log(`[MCP Pool] No warm process available, spawning new one (available: ${this.availableProcesses.length}, warming: ${this.warmingProcesses.length})`);
+    this.spawnProcess().then(proc => {
+      if (proc && !proc.killed) {
+        this.availableProcesses.push(proc);
+      }
+    });
+
+    // For now, create and return one immediately (fallback behavior)
     const proc = spawn('node', [MCPscriptPath], {
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env, NODE_ENV: 'production' }
+      env: {
+        ...process.env,
+        NODE_ENV: 'production',
+        TDX_BASE_URL: process.env.TDX_BASE_URL,
+        TDX_BEID: process.env.TDX_BEID,
+        TDX_WEB_SERVICES_KEY: process.env.TDX_WEB_SERVICES_KEY,
+        TDX_APP_ID: process.env.TDX_APP_ID
+      }
     });
 
     proc.on('error', (err) => {
@@ -49,24 +126,206 @@ class MCPServerPool {
   }
 
   releaseProcess(proc) {
-    if (proc && !proc.killed && this.processes.length < this.maxProcesses) {
-      this.processes.push(proc);
+    if (proc && !proc.killed && this.availableProcesses.length < this.maxProcesses) {
+      // Reset process for reuse
+      this.availableProcesses.push(proc);
+      // Start warming more processes if needed
+      this.warmup();
     } else if (proc && !proc.killed) {
       proc.kill();
     }
   }
 
   cleanup() {
-    this.processes.forEach(proc => {
+    this.availableProcesses.forEach(proc => {
       if (proc && !proc.killed) {
         proc.kill();
       }
     });
-    this.processes = [];
+    this.availableProcesses = [];
+    this.warmingProcesses = [];
+  }
+
+  async initialize() {
+    console.log('[MCP Pool] Initializing process pool...');
+    await this.warmup();
+    // Wait for initial warm-up to complete
+    await Promise.allSettled(this.warmingProcesses);
+    console.log(`[MCP Pool] Pool initialized with ${this.availableProcesses.length} ready processes`);
   }
 }
 
 const mcpPool = new MCPServerPool();
+
+// MCP Session Manager for HTTP transport
+class MCPSession {
+  constructor(sessionId) {
+    this.sessionId = sessionId;
+    this.mcp = null;
+    this.requestId = 0;
+    this.pendingRequests = new Map();
+    this.sseClients = [];
+    this.messageQueue = [];
+    this.outputBuffer = ''; // Buffer for multi-line responses
+  }
+
+  initialize() {
+    this.mcp = mcpPool.getProcess();
+    this.setupMCPListeners();
+  }
+
+  setupMCPListeners() {
+    this.mcp.stdout.on('data', (data) => {
+      this.outputBuffer += data.toString();
+      this.processBuffer();
+    });
+
+    this.mcp.stderr.on('data', (data) => {
+      console.error(`[MCP Session] stderr for ${this.sessionId}:`, data.toString());
+    });
+
+    this.mcp.on('error', (err) => {
+      console.error(`[MCP Session] Process error for ${this.sessionId}:`, err);
+      this.broadcastToClients({ type: 'error', error: err.message });
+    });
+
+    this.mcp.on('close', (code) => {
+      console.log(`[MCP Session] Process closed for ${this.sessionId} with code ${code}`);
+      // Process any remaining buffer
+      this.processBuffer(true);
+      this.broadcastToClients({ type: 'closed', code });
+    });
+  }
+
+  processBuffer(force = false) {
+    // Try to extract complete JSON-RPC messages from buffer
+    let startIdx = 0;
+    let braceCount = 0;
+    let inString = false;
+    let escaped = false;
+
+    for (let i = 0; i < this.outputBuffer.length; i++) {
+      const char = this.outputBuffer[i];
+
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+
+      if (char === '"' && !escaped) {
+        inString = !inString;
+        continue;
+      }
+
+      if (!inString) {
+        if (char === '{') braceCount++;
+        if (char === '}') braceCount--;
+
+        // Complete JSON object found
+        if (braceCount === 0 && i > startIdx && this.outputBuffer[startIdx] === '{') {
+          try {
+            const jsonStr = this.outputBuffer.substring(startIdx, i + 1);
+            const message = JSON.parse(jsonStr);
+            console.log(`[MCP Session] Parsed response for ${this.sessionId}:`, JSON.stringify(message).substring(0, 150));
+            this.handleMCPResponse(message);
+            startIdx = i + 1;
+          } catch (err) {
+            console.error('[MCP Session] Parse error:', err.message);
+          }
+        }
+      }
+    }
+
+    // Keep unparsed portion in buffer, trim processed portion
+    if (startIdx > 0) {
+      this.outputBuffer = this.outputBuffer.substring(startIdx).trim();
+    }
+
+    // Skip logging lines that aren't JSON
+    if (this.outputBuffer && !this.outputBuffer.startsWith('{')) {
+      const lines = this.outputBuffer.split('\n');
+      const jsonStart = lines.findIndex(line => line.trim().startsWith('{'));
+      if (jsonStart > 0) {
+        this.outputBuffer = lines.slice(jsonStart).join('\n');
+      }
+    }
+  }
+
+  sendRequest(message) {
+    console.log(`[MCP Session] Sending request to ${this.sessionId}:`, JSON.stringify(message).substring(0, 100));
+    if (!this.mcp || this.mcp.killed) {
+      console.log(`[MCP Session] Initializing new MCP process for ${this.sessionId}`);
+      this.initialize();
+    }
+    try {
+      const msgStr = JSON.stringify(message) + '\n';
+      console.log(`[MCP Session] Writing to stdin: ${msgStr.substring(0, 100)}`);
+      this.mcp.stdin.write(msgStr);
+    } catch (err) {
+      console.error('[MCP Session] Write error:', err);
+    }
+  }
+
+  handleMCPResponse(message) {
+    // Broadcast to all SSE clients
+    this.broadcastToClients(message);
+  }
+
+  registerSSEClient(res) {
+    this.sseClients.push(res);
+    
+    // Send any queued messages
+    this.messageQueue.forEach(msg => {
+      res.write(`data: ${JSON.stringify(msg)}\n\n`);
+    });
+    this.messageQueue = [];
+  }
+
+  broadcastToClients(message) {
+    this.sseClients = this.sseClients.filter(res => !res.destroyed);
+    
+    if (this.sseClients.length === 0) {
+      this.messageQueue.push(message);
+    } else {
+      this.sseClients.forEach(res => {
+        res.write(`data: ${JSON.stringify(message)}\n\n`);
+      });
+    }
+  }
+
+  removeSSEClient(res) {
+    this.sseClients = this.sseClients.filter(r => r !== res);
+  }
+
+  cleanup() {
+    this.sseClients.forEach(res => {
+      if (!res.destroyed) {
+        res.end();
+      }
+    });
+    this.sseClients = [];
+    if (this.mcp && !this.mcp.killed) {
+      this.mcp.kill();
+    }
+    mcpPool.releaseProcess(this.mcp);
+  }
+}
+
+const mcpSessions = new Map();
+
+function getOrCreateSession(sessionId) {
+  if (!mcpSessions.has(sessionId)) {
+    const session = new MCPSession(sessionId);
+    session.initialize();
+    mcpSessions.set(sessionId, session);
+  }
+  return mcpSessions.get(sessionId);
+}
 
 // Create HTTP server
 const server = http.createServer((req, res) => {
@@ -74,7 +333,6 @@ const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Content-Type', 'application/json');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(200);
@@ -82,20 +340,34 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // API Key authentication (if configured)
-  if (API_KEY && req.url !== '/health') {
+  // API Key authentication (if configured, but allow /health without auth)
+  if (API_KEY && req.url !== '/health' && req.url !== '/') {
     const authHeader = req.headers.authorization || '';
     const providedKey = authHeader.replace('Bearer ', '').trim();
     
     if (!providedKey || providedKey !== API_KEY) {
       res.writeHead(401);
+      res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({ error: 'Unauthorized: Invalid or missing API key' }));
       return;
     }
   }
 
+  // MCP-over-HTTP root endpoint (for VS Code HTTP client)
+  if ((req.url === '/' || req.url.startsWith('/?')) && req.method === 'POST') {
+    handleMCPHTTPRequest(req, res);
+    return;
+  }
+
+  // MCP-over-HTTP SSE endpoint
+  if ((req.url === '/' || req.url.startsWith('/?')) && req.method === 'GET') {
+    handleMCPSSE(req, res);
+    return;
+  }
+
   // Health check endpoint (no auth required)
   if (req.url === '/health' && req.method === 'GET') {
+    res.setHeader('Content-Type', 'application/json');
     res.writeHead(200);
     res.end(JSON.stringify({ 
       status: 'healthy', 
@@ -107,6 +379,7 @@ const server = http.createServer((req, res) => {
 
   // Status endpoint
   if (req.url === '/status' && req.method === 'GET') {
+    res.setHeader('Content-Type', 'application/json');
     res.writeHead(200);
     res.end(JSON.stringify({
       service: 'TDX MCP HTTP Wrapper',
@@ -135,6 +408,7 @@ const server = http.createServer((req, res) => {
         handleMcpRequest(message, res);
       } catch (err) {
         console.error('[HTTP Server] JSON parse error:', err.message);
+        res.setHeader('Content-Type', 'application/json');
         res.writeHead(400);
         res.end(JSON.stringify({ error: 'Invalid JSON', details: err.message }));
       }
@@ -144,6 +418,7 @@ const server = http.createServer((req, res) => {
 
   // Tools endpoint - list available tools
   if (req.url === '/tools' && req.method === 'GET') {
+    res.setHeader('Content-Type', 'application/json');
     res.writeHead(200);
     res.end(JSON.stringify({
       tools: [
@@ -166,9 +441,82 @@ const server = http.createServer((req, res) => {
   }
 
   // 404 for unknown routes
+  res.setHeader('Content-Type', 'application/json');
   res.writeHead(404);
   res.end(JSON.stringify({ error: 'Not found', path: req.url }));
 });
+
+// Handle MCP-over-HTTP requests (POST to root)
+function handleMCPHTTPRequest(req, res) {
+  const sessionId = req.headers['x-mcp-session'] || 'default';
+  let body = '';
+
+  req.on('data', chunk => {
+    body += chunk.toString();
+    if (body.length > 1e6) {
+      req.connection.destroy();
+    }
+  });
+
+  req.on('end', () => {
+    try {
+      const message = JSON.parse(body);
+      const session = getOrCreateSession(sessionId);
+      
+      // Send to MCP server
+      session.sendRequest(message);
+      
+      // Send acknowledgement
+      res.setHeader('Content-Type', 'application/json');
+      res.writeHead(202); // Accepted
+      res.end(JSON.stringify({ accepted: true, sessionId }));
+    } catch (err) {
+      console.error('[MCP HTTP] JSON parse error:', err.message);
+      res.setHeader('Content-Type', 'application/json');
+      res.writeHead(400);
+      res.end(JSON.stringify({ error: 'Invalid JSON', details: err.message }));
+    }
+  });
+}
+
+// Handle MCP-over-HTTP SSE (GET to root)
+function handleMCPSSE(req, res) {
+  const sessionId = req.headers['x-mcp-session'] || req.url.split('?sessionId=')[1] || 'default';
+  
+  console.log(`[MCP SSE] Client connecting with session: ${sessionId}`);
+
+  // Set SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+
+  // Send initial connection message
+  res.write(`data: ${JSON.stringify({
+    type: 'connected',
+    sessionId: sessionId,
+    timestamp: new Date().toISOString()
+  })}\n\n`);
+
+  const session = getOrCreateSession(sessionId);
+  session.registerSSEClient(res);
+
+  // Handle client disconnect
+  req.on('close', () => {
+    console.log(`[MCP SSE] Client disconnected: ${sessionId}`);
+    session.removeSSEClient(res);
+    if (session.sseClients.length === 0) {
+      console.log(`[MCP SSE] No more clients for session ${sessionId}, cleaning up`);
+      session.cleanup();
+      mcpSessions.delete(sessionId);
+    }
+  });
+
+  req.on('error', (err) => {
+    console.error(`[MCP SSE] Client error: ${err.message}`);
+    session.removeSSEClient(res);
+  });
+}
 
 // Handle MCP JSON-RPC requests
 function handleMcpRequest(message, res) {
@@ -226,7 +574,15 @@ function handleMcpRequest(message, res) {
         if (output) {
           const results = output
             .split('\n')
-            .filter(line => line.trim())
+            .filter(line => {
+              const trimmed = line.trim();
+              // Skip empty lines and dotenv logging
+              if (!trimmed || trimmed.startsWith('◇') || trimmed.startsWith('⌘') || trimmed.startsWith('⌁')) {
+                return false;
+              }
+              // Only include JSON-RPC responses
+              return trimmed.startsWith('{');
+            })
             .map(line => JSON.parse(line));
 
           res.writeHead(200);
@@ -264,19 +620,30 @@ function handleMcpRequest(message, res) {
 }
 
 // Start HTTP server
-server.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, '0.0.0.0', async () => {
   console.log(`[HTTP Server] MCP HTTP Wrapper started on port ${PORT}`);
   console.log(`[HTTP Server] API Key Required: ${API_KEY ? 'YES' : 'NO'}`);
-  console.log(`[HTTP Server] Health check: http://localhost:${PORT}/health`);
-  console.log(`[HTTP Server] Status: http://localhost:${PORT}/status`);
-  console.log(`[HTTP Server] MCP endpoint: http://localhost:${PORT}/mcp`);
-  console.log(`[HTTP Server] Tools list: http://localhost:${PORT}/tools`);
+  console.log(`[HTTP Server] MCP-over-HTTP (SSE): GET http://localhost:${PORT}/`);
+  console.log(`[HTTP Server] MCP-over-HTTP (POST): POST http://localhost:${PORT}/`);
+  console.log(`[HTTP Server] Health check: GET http://localhost:${PORT}/health`);
+  console.log(`[HTTP Server] Status: GET http://localhost:${PORT}/status`);
+  console.log(`[HTTP Server] MCP endpoint: POST http://localhost:${PORT}/mcp`);
+  console.log(`[HTTP Server] Tools list: GET http://localhost:${PORT}/tools`);
+
+  // Initialize process pool with warm processes
+  console.log('[HTTP Server] Warming up process pool...');
+  await mcpPool.initialize();
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('[HTTP Server] SIGTERM received, shutting down gracefully...');
   server.close(() => {
+    // Clean up all MCP sessions
+    mcpSessions.forEach((session) => {
+      session.cleanup();
+    });
+    mcpSessions.clear();
     mcpPool.cleanup();
     console.log('[HTTP Server] Server closed');
     process.exit(0);
@@ -291,6 +658,10 @@ process.on('SIGTERM', () => {
 
 process.on('SIGINT', () => {
   console.log('[HTTP Server] SIGINT received, shutting down...');
+  mcpSessions.forEach((session) => {
+    session.cleanup();
+  });
+  mcpSessions.clear();
   mcpPool.cleanup();
   process.exit(0);
 });

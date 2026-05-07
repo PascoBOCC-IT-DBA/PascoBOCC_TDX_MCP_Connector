@@ -26,3 +26,6 @@ npm-debug.log*
 # Deployment & Configuration
 COPILOT_INTEGRATION.md
 tdx-mcp.service
+
+# Test & Query Scripts
+/scripts
