@@ -1,8 +1,8 @@
 # TeamDynamix MCP Server - Complete Tools Reference & Testing Report
 
 **Last Updated:** May 11, 2026 (15:35 UTC)  
-**Total Tools:** 44 tools across 10 categories  
-**Status Summary:** 5 EXTENSIVELY TESTED (✅), 17 INFRASTRUCTURE VERIFIED (📋), 27 SAFELY DISABLED (🔴)
+**Total Tools:** 43 tools across 10 categories  
+**Status Summary:** 5 EXTENSIVELY TESTED (✅), 17 INFRASTRUCTURE VERIFIED (📋), 26 SAFELY DISABLED (🔴)
 
 **Current Deployment Status:**
 - ✅ Production server DEPLOYED & STABLE (running 5+ minutes without crashes)
@@ -51,9 +51,9 @@
 - ✅ No ERR_HTTP_HEADERS_SENT errors (fixed via atomic header management)
 
 ### Tool Registration & Availability
-- **Total Tools Registered:** 44
+- **Total Tools Registered:** 43
 - **Read-Only Tools Enabled:** 17 (100% discoverable)
-- **Modification Tools Disabled:** 27 (via ALLOW_MODIFICATIONS=false)
+- **Modification Tools Disabled:** 26 (via ALLOW_MODIFICATIONS=false)
 - **Discovery Endpoint:** /tools (requires Bearer token auth)
 - **Execution Endpoint:** /mcp (JSON-RPC POST)
 
@@ -64,7 +64,7 @@
 
 ---
 
-## Tested & Verified Tools (5/44)
+## Tested & Verified Tools (5/43)
 
 ### Tickets Category
 
@@ -120,7 +120,7 @@ The following tools are **ENABLED** and ready for use. Comprehensive parameter d
 
 ---
 
-## Modification Tools - Intentionally Disabled (27 total)
+## Modification Tools - Intentionally Disabled (26 total)
 
 The following tools are **DISABLED** for safety. They will return "not found" errors until ALLOW_MODIFICATIONS is set to "true".
 
@@ -170,7 +170,7 @@ Then restart the service:
 sudo systemctl restart tdx-mcp
 ```
 
-**WARNING:** Enabling modifications allows all 27 tools to execute write operations. Use in development/staging only.
+**WARNING:** Enabling modifications allows all 26 tools to execute write operations. Use in development/staging only.
 
 ---
 
@@ -1789,7 +1789,7 @@ Searches groups/teams with filtering.
 | ✅ TESTED | 5 | tdx-ticket-search, tdx-ticket-get, tdx-ticket-feed-get, tdx-statuses-get, tdx-attributes-get |
 | ✅ DOCUMENTED & READY | 17 | CMDB (3), KB (2), Projects (2), People (3), Accounts (2), Groups (2), Assets (3) |
 | 🔴 DISABLED (Modifications) | 22 | Tickets (6), Assets (5), CMDB (5), KB (3), Projects (2), People (1) |
-| **TOTAL** | **44** | |
+| **TOTAL** | **43** | |
 
 ---
 

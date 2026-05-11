@@ -10,7 +10,7 @@ This server exposes **43 tools** across **10 domains** — tickets, assets, CMDB
 
 ✅ **Server:** Deployed and running  
 ✅ **Status:** Stable & Operational  
-✅ **Tools:** 44 registered (17 enabled, 27 disabled)  
+✅ **Tools:** 43 total (17 read-only enabled, 26 modification disabled)  
 ✅ **Auth:** Bearer token required
 
 > **Note:** Server address and API key are maintained separately. Contact your system administrator for access credentials.  
@@ -89,7 +89,7 @@ Tokens are fetched lazily on the first tool call and auto-refreshed after 23 hou
 | `TDX_APP_ID` | Yes | Default TDX application ID (integer) |
 | `TDX_ASSETS_APP_ID` | No | TDX application ID for asset operations (integer). If not set, defaults to `TDX_APP_ID` |
 | `TDX_KB_APP_ID` | No | TDX application ID for knowledge base operations (integer). If not set, defaults to `TDX_APP_ID` |
-| `ALLOW_MODIFICATIONS` | No | Enable/disable modification tools (create, update, delete). Set to `"true"` to enable 27 modification tools. Default is `"false"` (safe mode - read-only) |
+| `ALLOW_MODIFICATIONS` | No | Enable/disable modification tools (create, update, delete). Set to `"true"` to enable 26 modification tools. Default is `"false"` (safe mode - read-only) |
 
 ## Tools (43)
 
@@ -214,7 +214,7 @@ The HTTP wrapper (`src/http-wrapper.js`) spawns MCP server processes on-demand a
 
 | Document | Purpose |
 |----------|---------|
-| **[TDX_MCP_TOOLS_COMPLETE_REFERENCE.md](TDX_MCP_TOOLS_COMPLETE_REFERENCE.md)** | Complete reference for all 44 tools with parameters, test cases, and infrastructure verification results |
+| **[TDX_MCP_TOOLS_COMPLETE_REFERENCE.md](TDX_MCP_TOOLS_COMPLETE_REFERENCE.md)** | Complete reference for all 43 tools with parameters, test cases, and infrastructure verification results |
 | **[DEPLOYMENT_UBUNTU.md](DEPLOYMENT_UBUNTU.md)** | Ubuntu server deployment, systemd service setup, and production configuration |
 | **[COPILOT_INTEGRATION.md](COPILOT_INTEGRATION.md)** | GitHub Copilot Chat and Microsoft Copilot Studio integration instructions |
 
@@ -222,7 +222,7 @@ The HTTP wrapper (`src/http-wrapper.js`) spawns MCP server processes on-demand a
 
 ✅ **5 Tools Extensively Tested:** tdx-ticket-search, tdx-ticket-get, tdx-ticket-feed-get, tdx-statuses-get, tdx-attributes-get  
 ✅ **17 Read-Only Tools:** All enabled and ready for use  
-✅ **27 Modification Tools:** Safely disabled (set `ALLOW_MODIFICATIONS=true` in .env to enable)  
+✅ **26 Modification Tools:** Safely disabled (set `ALLOW_MODIFICATIONS=true` in .env to enable)  
 ✅ **Infrastructure:** Verified stable (5+ minute uptime, no concurrency errors)
 
 See [TDX_MCP_TOOLS_COMPLETE_REFERENCE.md](TDX_MCP_TOOLS_COMPLETE_REFERENCE.md) for complete testing results and all tool documentation.
