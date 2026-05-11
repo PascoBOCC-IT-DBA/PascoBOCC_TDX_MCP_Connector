@@ -197,20 +197,27 @@ class MCPServerPool {
   }
 
   getProcess() {
-    // Return existing process if available
+    // Return existing warm process if available
     if (this.availableProcesses.length > 0) {
-      return this.availableProcesses.pop();
+      const proc = this.availableProcesses.pop();
+      console.log(`[MCP Pool] Using warm process (PID: ${proc.pid}), remaining: ${this.availableProcesses.length}`);
+      return proc;
     }
 
-    // Spawn new process immediately (synchronously, but will complete in background)
-    console.log(`[MCP Pool] No warm process available, spawning new one (available: ${this.availableProcesses.length}, warming: ${this.warmingProcesses.length})`);
-    this.spawnProcess().then(proc => {
-      if (proc && !proc.killed) {
-        this.availableProcesses.push(proc);
-      }
-    });
+    // If no warm process and we can spawn more, do it now (blocking wait for warmup)
+    if (this.availableProcesses.length + this.warmingProcesses.length < this.maxProcesses) {
+      console.log(`[MCP Pool] No warm process, spawning new one (available: ${this.availableProcesses.length}, warming: ${this.warmingProcesses.length})`);
+      // Spawn and wait for it to be ready - user will wait
+      return this.spawnProcessSync();
+    }
 
-    // For now, create and return one immediately (fallback behavior)
+    // Worst case: wait for a warming process to complete
+    console.log(`[MCP Pool] WARNING: All processes busy (${this.maxProcesses}), reusing busy process`);
+    return this.spawnProcessSync();
+  }
+
+  spawnProcessSync() {
+    // Synchronous spawn - returns immediately, process initializes in background
     const proc = spawn('node', [MCPscriptPath], {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: {
@@ -226,7 +233,7 @@ class MCPServerPool {
     });
 
     proc.on('error', (err) => {
-      console.error('[MCP Pool] Process error:', err);
+      console.error('[MCP Pool] Process error (PID: ' + proc.pid + '):', err);
     });
 
     return proc;
@@ -503,6 +510,8 @@ function getOrCreateSession(sessionId) {
 
 // Create HTTP server
 const server = http.createServer((req, res) => {
+  console.log(`[HTTP] ${req.method} ${req.url}`);
+  
   // Helper to send response with consistent CORS headers
   const sendResponse = (statusCode: number, contentType: string, body: string) => {
     res.writeHead(statusCode, {
@@ -582,16 +591,20 @@ const server = http.createServer((req, res) => {
 
     req.on('data', chunk => {
       body += chunk.toString();
+      console.log(`[HTTP MCP] Received ${body.length} bytes`);
       if (body.length > 1e6) {
         req.connection.destroy();
       }
     });
 
     req.on('end', () => {
+      console.log(`[HTTP MCP] Request complete, body length: ${body.length}`);
       try {
         const message = JSON.parse(body);
+        console.log(`[HTTP MCP] Parsed JSON, calling handleMcpRequest`);
         handleMcpRequest(message, res);
       } catch (err) {
+        console.log(`[HTTP MCP] JSON parse error: ${err}`);
         sendError(400, 'Invalid JSON', (err as Error).message);
       }
     });
@@ -818,16 +831,25 @@ function handleMCPSSE(req, res) {
 
 // Handle MCP JSON-RPC requests
 function handleMcpRequest(message, res) {
+  console.log(`[HTTP MCP] handleMcpRequest called for message ID: ${message.id}`);
   const mcp = mcpPool.getProcess();
   const requestStartTime = Date.now();
+  const requestId = message.id || Math.random();
 
   let output = '';
   let error = '';
   let responded = false;
+  let dataListener: any = null;
+  let timeout: any = null;
 
   const sendJsonResponse = (statusCode: number, body: any) => {
     if (!responded) {
       responded = true;
+      clearTimeout(timeout);
+      if (dataListener) {
+        mcp.stdout.removeListener('data', dataListener);
+      }
+      
       res.writeHead(statusCode, {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
@@ -835,103 +857,74 @@ function handleMcpRequest(message, res) {
         'Access-Control-Allow-Headers': 'Content-Type, Authorization'
       });
       res.end(JSON.stringify(body));
+      
+      // Release process back to pool (only if still alive)
+      if (mcp && !mcp.killed) {
+        mcpPool.releaseProcess(mcp);
+        console.log(`[HTTP MCP] Released process (PID: ${mcp.pid}) back to pool`);
+      }
     }
   };
 
-  const timeout = setTimeout(() => {
+  // Timeout for this specific request
+  timeout = setTimeout(() => {
     if (!responded) {
-      responded = true;
-      mcp.kill();
-      mcpPool.releaseProcess(null);
-      sendJsonResponse(504, { error: 'MCP server timeout' });
+      console.error(`[HTTP MCP] Request ${requestId} timeout after 60s`);
+      sendJsonResponse(504, { error: 'MCP request timeout (60s exceeded)' });
     }
-  }, 10000);
+  }, 60000);
 
-  mcp.stdout.on('data', (data) => {
+  // Set up one-time data listener for this request
+  dataListener = (data: Buffer) => {
     output += data.toString();
-  });
+    console.log(`[HTTP MCP] Received ${data.length} bytes, total: ${output.length}`);
 
-  mcp.stderr.on('data', (data) => {
-    error += data.toString();
-    console.error('[MCP Process] stderr:', data.toString());
-  });
+    // Try to extract a complete JSON response
+    const lines = output.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line || line.startsWith('◇') || line.startsWith('⌘') || line.startsWith('⌁')) {
+        continue; // Skip non-JSON lines
+      }
 
-  mcp.on('error', (err) => {
+      if (line.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(line);
+          console.log(`[HTTP MCP] Parsed JSON-RPC response with id: ${parsed.id}`);
+          
+          // Check if this is the response we're waiting for
+          if (parsed.id === message.id || parsed.id === requestId) {
+            // Transform and send response
+            const transformed = transformMCPResponse(parsed, message);
+            sendJsonResponse(200, { result: transformed });
+            return;
+          }
+        } catch (e) {
+          // Not valid JSON, continue
+        }
+      }
+    }
+  };
+
+  mcp.stdout.on('data', dataListener);
+
+  // Send the request
+  try {
+    const msgStr = JSON.stringify(message) + '\n';
+    console.log(`[HTTP MCP] Sending request to process (PID: ${mcp.pid}): ${msgStr.substring(0, 100)}`);
+    mcp.stdin.write(msgStr);
+  } catch (err) {
+    console.error(`[HTTP MCP] Write error: ${err}`);
+    sendJsonResponse(500, { error: 'Failed to send request to MCP', details: (err as Error).message });
+  }
+
+  // Handle process errors
+  mcp.once('error', (err) => {
     if (!responded) {
-      responded = true;
-      clearTimeout(timeout);
+      console.error(`[HTTP MCP] Process error: ${err}`);
       sendJsonResponse(500, { error: 'MCP process error', details: (err as Error).message });
     }
   });
-
-  mcp.on('close', (code) => {
-    clearTimeout(timeout);
-
-    if (!responded) {
-      responded = true;
-
-      if (code !== 0) {
-        console.error(`[MCP Process] Exited with code ${code}`);
-        if (error) {
-          sendJsonResponse(500, { error: 'MCP execution error', details: error });
-          mcpPool.releaseProcess(null);
-          return;
-        }
-      }
-
-      try {
-        // Try to parse output as JSON
-        if (output) {
-          const results = output
-            .split('\n')
-            .filter(line => {
-              const trimmed = line.trim();
-              // Skip empty lines and dotenv logging
-              if (!trimmed || trimmed.startsWith('◇') || trimmed.startsWith('⌘') || trimmed.startsWith('⌁')) {
-                return false;
-              }
-              // Only include JSON-RPC responses
-              return trimmed.startsWith('{');
-            })
-            .map(line => JSON.parse(line));
-
-          // Transform responses for better agent consumption
-          const transformedResults = results.map(result => transformMCPResponse(result, message));
-
-          const executionTime = Date.now() - requestStartTime;
-          
-          sendJsonResponse(200, {
-            success: true,
-            results: transformedResults.length === 1 ? transformedResults[0] : transformedResults,
-            meta: {
-              executionTimeMs: executionTime,
-              timestamp: new Date().toISOString()
-            }
-          });
-        } else {
-          sendJsonResponse(200, { success: true, message: 'Processed' });
-        }
-      } catch (parseErr) {
-        console.error('[HTTP Server] Response parse error:', (parseErr as Error).message);
-        sendJsonResponse(200, { output: output, raw: true });
-      }
-    }
-
-    mcpPool.releaseProcess(null);
-  });
-
-  // Send the request to MCP server
-  try {
-    mcp.stdin.write(JSON.stringify(message) + '\n');
-    mcp.stdin.end();
-  } catch (err) {
-    console.error('[MCP Process] Write error:', err);
-    if (!responded) {
-      responded = true;
-      clearTimeout(timeout);
-      sendJsonResponse(500, { error: 'Failed to send to MCP', details: (err as Error).message });
-    }
-  }
 }
 
 // Start HTTP server
