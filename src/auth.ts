@@ -19,22 +19,30 @@ export class TdxAuth {
   }
 
   private async refresh(): Promise<string> {
-    const res = await fetch(`${this.config.baseUrl}/auth/loginadmin`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        BEID: this.config.beid,
-        WebServicesKey: this.config.webServicesKey,
-      }),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout for auth
+    
+    try {
+      const res = await fetch(`${this.config.baseUrl}/auth/loginadmin`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          BEID: this.config.beid,
+          WebServicesKey: this.config.webServicesKey,
+        }),
+        signal: controller.signal,
+      });
 
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`TDX admin auth failed (${res.status}): ${body}`);
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(`TDX admin auth failed (${res.status}): ${body}`);
+      }
+
+      this.token = await res.text();
+      this.tokenExpiry = Date.now() + TOKEN_LIFETIME_MS;
+      return this.token;
+    } finally {
+      clearTimeout(timeoutId);
     }
-
-    this.token = await res.text();
-    this.tokenExpiry = Date.now() + TOKEN_LIFETIME_MS;
-    return this.token;
   }
 }
