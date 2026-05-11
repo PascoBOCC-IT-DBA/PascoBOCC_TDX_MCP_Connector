@@ -79,6 +79,22 @@ This server uses TDX **admin token authentication** (`POST /auth/loginadmin`) wi
 
 Tokens are fetched lazily on the first tool call and auto-refreshed after 23 hours (1-hour buffer before the 24-hour TDX expiry).
 
+## Tool Availability & Safety-by-Default Design
+
+The server uses a **safety-by-default architecture** that separates read-only tools from modification tools:
+
+- **Read-Only Tools (17)** — Always available by default
+  - `get`, `search`, `lookup` operations across all domains
+  - No data changes, safe for exploration and analysis
+  - Examples: `tdx-ticket-search`, `tdx-asset-get`, `tdx-people-lookup`
+
+- **Modification Tools (26)** — Disabled by default, enable explicitly
+  - `create`, `update`, `patch`, `delete`, and `feed-add` operations
+  - Require `ALLOW_MODIFICATIONS=true` environment variable to enable
+  - Examples: `tdx-ticket-create`, `tdx-asset-update`, `tdx-cmdb-delete`
+
+This design prevents accidental data changes when the server is first deployed. Enable modifications only when you're ready to allow write operations.
+
 ## Environment Variables
 
 | Variable | Required | Description |
@@ -89,108 +105,167 @@ Tokens are fetched lazily on the first tool call and auto-refreshed after 23 hou
 | `TDX_APP_ID` | Yes | Default TDX application ID (integer) |
 | `TDX_ASSETS_APP_ID` | No | TDX application ID for asset operations (integer). If not set, defaults to `TDX_APP_ID` |
 | `TDX_KB_APP_ID` | No | TDX application ID for knowledge base operations (integer). If not set, defaults to `TDX_APP_ID` |
-| `ALLOW_MODIFICATIONS` | No | Enable/disable modification tools (create, update, delete). Set to `"true"` to enable 26 modification tools. Default is `"false"` (safe mode - read-only) |
+| `ALLOW_MODIFICATIONS` | No | Enable/disable modification tools. Set to `"true"` to enable 26 modification tools (create, update, delete). Default is `"false"` (safe mode - only 17 read-only tools accessible) |
 
-## Tools (43)
+## Architecture
+
+### Tool Organization
+
+All 43 tools are organized into **10 domains**, each with a separate registration module:
+
+- **Tickets** (`src/tools/tickets.ts`) — 9 tools: ticket management, comments, and asset linking
+- **Assets** (`src/tools/assets.ts`) — 8 tools: asset lifecycle, search, and categories
+- **CMDB** (`src/tools/cmdb.ts`) — 7 tools: configuration items and relationships
+- **Knowledge Base** (`src/tools/kb.ts`) — 5 tools: KB articles and search
+- **Projects** (`src/tools/projects.ts`) — 4 tools: project management
+- **People** (`src/tools/people.ts`) — 4 tools: user/person lookups and updates
+- **Accounts** (`src/tools/accounts.ts`) — 2 tools: account/department lookups
+- **Groups** (`src/tools/groups.ts`) — 2 tools: group lookups
+- **Statuses** (`src/tools/statuses.ts`) — 1 tool: status definitions
+- **Attributes** (`src/tools/attributes.ts`) — 1 tool: custom attribute definitions
+
+### Safety-by-Default Registration Pattern
+
+Each domain module exports two registration functions:
+
+```typescript
+// Always registered - read-only tools (get, search, lookup)
+export function registerXxxReadOnlyTools(server, client) { ... }
+
+// Conditionally registered - modification tools (create, update, delete)
+export function registerXxxTools(server, client) { ... }
+```
+
+This split ensures that:
+1. **Read-only tools are always available** for safe exploration and analysis
+2. **Modification tools require explicit opt-in** via `ALLOW_MODIFICATIONS=true`
+3. **New deployments are safe by default** — no accidental data changes until explicitly enabled
+
+In `src/index.ts`, registration calls implement the split:
+```typescript
+// Always called - read-only tools
+registerTicketReadOnlyTools(server, client);
+registerAssetReadOnlyTools(server, client);
+// ... etc for all domains ...
+
+// Conditionally called - modification tools
+registerIfAllowed(() => registerTicketTools(server, client), "registerTicketTools");
+registerIfAllowed(() => registerAssetTools(server, client), "registerAssetTools");
+// ... etc for all domains ...
+```
+
+### Process Pooling
+
+The HTTP wrapper maintains a warm pool of **5 MCP server processes** to minimize latency:
+- Cold process startup: 2-3 seconds
+- Pooled process reuse: <10ms
+- Pool size: 5 processes (minimum 2 warm, maximum 5)
+- Readiness detection: Waits for `[MCP Server Ready]` console signal
+
+This ensures consistent sub-100ms response times for tool calls.
+
+## Tools (43 Total: 17 Read-Only + 26 Modification)
 
 All tools that operate within an application accept an optional `appId` parameter to override the default from `TDX_APP_ID`.
 
-### Tickets (9 tools)
+**Legend:** 🔒 = Read-only (always available) | ✏️ = Modification (requires `ALLOW_MODIFICATIONS=true`)
 
-| Tool | Method | Endpoint | Description |
-|------|--------|----------|-------------|
-| `tdx-ticket-create` | POST | `/{appId}/tickets` | Create a new ticket |
-| `tdx-ticket-get` | GET | `/{appId}/tickets/{id}` | Get a ticket by ID |
-| `tdx-ticket-update` | POST | `/{appId}/tickets/{id}` | Full update of a ticket |
-| `tdx-ticket-patch` | PATCH | `/{appId}/tickets/{id}` | Partial update of a ticket |
-| `tdx-ticket-search` | POST | `/{appId}/tickets/search` | Search tickets with filters |
-| `tdx-ticket-feed-get` | GET | `/{appId}/tickets/{id}/feed` | Get ticket comments/feed |
-| `tdx-ticket-feed-add` | POST | `/{appId}/tickets/{id}/feed` | Add a comment to a ticket |
-| `tdx-ticket-add-asset` | POST | `/{appId}/tickets/{id}/assets/{assetId}` | Link an asset to a ticket |
-| `tdx-ticket-add-contact` | POST | `/{appId}/tickets/{id}/contacts/{uid}` | Add a contact to a ticket |
+### Tickets (9 tools: 3 read-only + 6 modification)
 
-### Assets (8 tools)
+| Tool | Availability | Method | Endpoint | Description |
+|------|--------------|--------|----------|-------------|
+| `tdx-ticket-get` | 🔒 | GET | `/{appId}/tickets/{id}` | Get a ticket by ID |
+| `tdx-ticket-search` | 🔒 | POST | `/{appId}/tickets/search` | Search tickets with filters |
+| `tdx-ticket-feed-get` | 🔒 | GET | `/{appId}/tickets/{id}/feed` | Get ticket comments/feed |
+| `tdx-ticket-create` | ✏️ | POST | `/{appId}/tickets` | Create a new ticket |
+| `tdx-ticket-update` | ✏️ | POST | `/{appId}/tickets/{id}` | Full update of a ticket |
+| `tdx-ticket-patch` | ✏️ | PATCH | `/{appId}/tickets/{id}` | Partial update of a ticket |
+| `tdx-ticket-feed-add` | ✏️ | POST | `/{appId}/tickets/{id}/feed` | Add a comment to a ticket |
+| `tdx-ticket-add-asset` | ✏️ | POST | `/{appId}/tickets/{id}/assets/{assetId}` | Link an asset to a ticket |
+| `tdx-ticket-add-contact` | ✏️ | POST | `/{appId}/tickets/{id}/contacts/{uid}` | Add a contact to a ticket |
 
-| Tool | Method | Endpoint | Description |
-|------|--------|----------|-------------|
-| `tdx-asset-create` | POST | `/{appId}/assets` | Create a new asset |
-| `tdx-asset-get` | GET | `/{appId}/assets/{id}` | Get an asset by ID |
-| `tdx-asset-update` | POST | `/{appId}/assets/{id}` | Full update of an asset |
-| `tdx-asset-patch` | PATCH | `/{appId}/assets/{id}` | Partial update of an asset |
-| `tdx-asset-delete` | DELETE | `/{appId}/assets/{id}` | Delete an asset |
-| `tdx-asset-search` | POST | `/{appId}/assets/search` | Search assets with filters |
-| `tdx-asset-feed-add` | POST | `/{appId}/assets/{id}/feed` | Add a comment to an asset |
-| `tdx-asset-categories` | GET | `/assets/forms` | Get all available asset categories/forms |
+### Assets (8 tools: 3 read-only + 5 modification)
 
-### CMDB / Configuration Items (7 tools)
+| Tool | Availability | Method | Endpoint | Description |
+|------|--------------|--------|----------|-------------|
+| `tdx-asset-get` | 🔒 | GET | `/{appId}/assets/{id}` | Get an asset by ID |
+| `tdx-asset-search` | 🔒 | POST | `/{appId}/assets/search` | Search assets with filters |
+| `tdx-asset-categories` | 🔒 | GET | `/assets/forms` | Get all available asset categories/forms |
+| `tdx-asset-create` | ✏️ | POST | `/{appId}/assets` | Create a new asset |
+| `tdx-asset-update` | ✏️ | POST | `/{appId}/assets/{id}` | Full update of an asset |
+| `tdx-asset-patch` | ✏️ | PATCH | `/{appId}/assets/{id}` | Partial update of an asset |
+| `tdx-asset-delete` | ✏️ | DELETE | `/{appId}/assets/{id}` | Delete an asset |
+| `tdx-asset-feed-add` | ✏️ | POST | `/{appId}/assets/{id}/feed` | Add a comment to an asset |
 
-| Tool | Method | Endpoint | Description |
-|------|--------|----------|-------------|
-| `tdx-cmdb-create` | POST | `/{appId}/cmdb` | Create a new CI |
-| `tdx-cmdb-get` | GET | `/{appId}/cmdb/{id}` | Get a CI by ID |
-| `tdx-cmdb-update` | PUT | `/{appId}/cmdb/{id}` | Full update of a CI |
-| `tdx-cmdb-delete` | DELETE | `/{appId}/cmdb/{id}` | Delete a CI |
-| `tdx-cmdb-search` | POST | `/{appId}/cmdb/search` | Search CIs with filters |
-| `tdx-cmdb-feed-add` | POST | `/{appId}/cmdb/{id}/feed` | Add a comment to a CI |
-| `tdx-cmdb-add-relationship` | PUT | `/{appId}/cmdb/{id}/relationships` | Add a relationship between CIs |
+### CMDB / Configuration Items (7 tools: 2 read-only + 5 modification)
 
-### Knowledge Base (5 tools)
+| Tool | Availability | Method | Endpoint | Description |
+|------|--------------|--------|----------|-------------|
+| `tdx-cmdb-get` | 🔒 | GET | `/{appId}/cmdb/{id}` | Get a CI by ID |
+| `tdx-cmdb-search` | 🔒 | POST | `/{appId}/cmdb/search` | Search CIs with filters |
+| `tdx-cmdb-create` | ✏️ | POST | `/{appId}/cmdb` | Create a new CI |
+| `tdx-cmdb-update` | ✏️ | PUT | `/{appId}/cmdb/{id}` | Full update of a CI |
+| `tdx-cmdb-delete` | ✏️ | DELETE | `/{appId}/cmdb/{id}` | Delete a CI |
+| `tdx-cmdb-feed-add` | ✏️ | POST | `/{appId}/cmdb/{id}/feed` | Add a comment to a CI |
+| `tdx-cmdb-add-relationship` | ✏️ | PUT | `/{appId}/cmdb/{id}/relationships` | Add a relationship between CIs |
 
-| Tool | Method | Endpoint | Description |
-|------|--------|----------|-------------|
-| `tdx-kb-create` | POST | `/{appId}/knowledgebase` | Create a KB article |
-| `tdx-kb-get` | GET | `/{appId}/knowledgebase/{id}` | Get a KB article by ID |
-| `tdx-kb-update` | PUT | `/{appId}/knowledgebase/{id}` | Update a KB article |
-| `tdx-kb-delete` | DELETE | `/{appId}/knowledgebase/{id}` | Delete a KB article |
-| `tdx-kb-search` | POST | `/{appId}/knowledgebase/search` | Search KB articles |
+### Knowledge Base (5 tools: 2 read-only + 3 modification)
 
-### People (4 tools)
+| Tool | Availability | Method | Endpoint | Description |
+|------|--------------|--------|----------|-------------|
+| `tdx-kb-get` | 🔒 | GET | `/{appId}/knowledgebase/{id}` | Get a KB article by ID |
+| `tdx-kb-search` | 🔒 | POST | `/{appId}/knowledgebase/search` | Search KB articles |
+| `tdx-kb-create` | ✏️ | POST | `/{appId}/knowledgebase` | Create a KB article |
+| `tdx-kb-update` | ✏️ | PUT | `/{appId}/knowledgebase/{id}` | Update a KB article |
+| `tdx-kb-delete` | ✏️ | DELETE | `/{appId}/knowledgebase/{id}` | Delete a KB article |
 
-These tools do not require an `appId`.
-
-| Tool | Method | Endpoint | Description |
-|------|--------|----------|-------------|
-| `tdx-people-get` | GET | `/people/{uid}` | Get a person by UID |
-| `tdx-people-search` | POST | `/people/search` | Search people with filters |
-| `tdx-people-lookup` | GET | `/people/lookup` | Quick lookup by name/email/username |
-| `tdx-people-update` | POST | `/people/{uid}` | Update a person |
-
-### Projects (4 tools)
+### People (4 tools: 3 read-only + 1 modification)
 
 These tools do not require an `appId`.
 
-| Tool | Method | Endpoint | Description |
-|------|--------|----------|-------------|
-| `tdx-project-create` | POST | `/projects` | Create a new project |
-| `tdx-project-get` | GET | `/projects/{id}` | Get a project by ID |
-| `tdx-project-update` | POST | `/projects/{id}` | Update a project |
-| `tdx-project-search` | POST | `/projects/search` | Search projects with filters |
+| Tool | Availability | Method | Endpoint | Description |
+|------|--------------|--------|----------|-------------|
+| `tdx-people-get` | 🔒 | GET | `/people/{uid}` | Get a person by UID |
+| `tdx-people-search` | 🔒 | POST | `/people/search` | Search people with filters |
+| `tdx-people-lookup` | 🔒 | GET | `/people/lookup` | Quick lookup by name/email/username |
+| `tdx-people-update` | ✏️ | POST | `/people/{uid}` | Update a person |
 
-### Accounts (2 tools)
+### Projects (4 tools: 2 read-only + 2 modification)
 
-| Tool | Method | Endpoint | Description |
-|------|--------|----------|-------------|
-| `tdx-account-get` | GET | `/accounts/{id}` | Get an account/department by ID |
-| `tdx-account-search` | POST | `/accounts/search` | Search accounts/departments |
+These tools do not require an `appId`.
 
-### Groups (2 tools)
+| Tool | Availability | Method | Endpoint | Description |
+|------|--------------|--------|----------|-------------|
+| `tdx-project-get` | 🔒 | GET | `/projects/{id}` | Get a project by ID |
+| `tdx-project-search` | 🔒 | POST | `/projects/search` | Search projects with filters |
+| `tdx-project-create` | ✏️ | POST | `/projects` | Create a new project |
+| `tdx-project-update` | ✏️ | POST | `/projects/{id}` | Update a project |
 
-| Tool | Method | Endpoint | Description |
-|------|--------|----------|-------------|
-| `tdx-group-get` | GET | `/groups/{id}` | Get a group by ID |
-| `tdx-group-search` | POST | `/groups/search` | Search groups |
+### Accounts (2 tools: read-only only)
 
-### Statuses (1 tool)
+| Tool | Availability | Method | Endpoint | Description |
+|------|--------------|--------|----------|-------------|
+| `tdx-account-get` | 🔒 | GET | `/accounts/{id}` | Get an account/department by ID |
+| `tdx-account-search` | 🔒 | POST | `/accounts/search` | Search accounts/departments |
 
-| Tool | Method | Endpoint | Description |
-|------|--------|----------|-------------|
-| `tdx-statuses-get` | GET | `/{componentType}/statuses` | Get available statuses for a component type (tickets, assets, projects, cmdb, knowledgebase) |
+### Groups (2 tools: read-only only)
 
-### Custom Attributes (1 tool)
+| Tool | Availability | Method | Endpoint | Description |
+|------|--------------|--------|----------|-------------|
+| `tdx-group-get` | 🔒 | GET | `/groups/{id}` | Get a group by ID |
+| `tdx-group-search` | 🔒 | POST | `/groups/search` | Search groups |
 
-| Tool | Method | Endpoint | Description |
-|------|--------|----------|-------------|
-| `tdx-attributes-get` | GET | `/attributes/custom` | Get custom attribute definitions for a component type |
+### Statuses (1 tool: read-only only)
+
+| Tool | Availability | Method | Endpoint | Description |
+|------|--------------|--------|----------|-------------|
+| `tdx-statuses-get` | 🔒 | GET | `/{componentType}/statuses` | Get available statuses for a component type (tickets, assets, projects, cmdb, knowledgebase) |
+
+### Custom Attributes (1 tool: read-only only)
+
+| Tool | Availability | Method | Endpoint | Description |
+|------|--------------|--------|----------|-------------|
+| `tdx-attributes-get` | 🔒 | GET | `/attributes/custom` | Get custom attribute definitions for a component type |
 
 Common `componentId` values for `tdx-attributes-get`: `9` = Ticket, `27` = Asset, `63` = CI, `39` = KB Article, `2` = Project.
 

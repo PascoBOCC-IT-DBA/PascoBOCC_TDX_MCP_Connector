@@ -89,6 +89,20 @@ sudo chown tdx-mcp:tdx-mcp /opt/tdx-mcp/.env
 sudo chmod 600 /opt/tdx-mcp/.env
 ```
 
+### Configuration: Tool Availability (ALLOW_MODIFICATIONS)
+
+The server operates in **safe mode by default**, enabling only read-only tools. To enable modification tools (create, update, delete), add this to your `.env` file:
+
+```bash
+# Default behavior (safe): only read-only tools available (17 tools)
+# ALLOW_MODIFICATIONS=false
+
+# To enable modification tools (26 additional tools)
+ALLOW_MODIFICATIONS=true
+```
+
+**Recommendation**: Deploy with `ALLOW_MODIFICATIONS=false` initially. Enable modifications only after testing read-only operations.
+
 ### Step 6: Create Systemd Service (HTTP Wrapper Mode)
 ```bash
 # Create service file for HTTP wrapper (persistent service mode)
@@ -104,6 +118,7 @@ WorkingDirectory=/opt/tdx-mcp
 Environment="NODE_ENV=production"
 Environment="MCP_HTTP_PORT=3000"
 Environment="MCP_API_KEY=your-secure-api-key-here"
+Environment="ALLOW_MODIFICATIONS=false"
 ExecStart=/usr/bin/node /opt/tdx-mcp/dist/http-wrapper.js
 Restart=on-failure
 RestartSec=10
@@ -116,7 +131,10 @@ WantedBy=multi-user.target
 EOF
 ```
 
-**Important**: Replace `your-secure-api-key-here` with a strong API key (see COPILOT_INTEGRATION.md for key generation).
+**Important Notes**:
+- Replace `your-secure-api-key-here` with a strong API key (see COPILOT_INTEGRATION.md for key generation)
+- Set `ALLOW_MODIFICATIONS=false` for safe-mode (default)
+- Change to `ALLOW_MODIFICATIONS=true` to enable 26 modification tools (create, update, delete)
 
 ### Step 7: Enable and Start Service
 ```bash
@@ -159,6 +177,64 @@ sudo systemctl restart tdx-mcp
 ```bash
 sudo systemctl stop tdx-mcp
 ```
+
+## Tool Availability & Modification Control
+
+### Understanding Tool Modes
+
+The server includes **43 tools** split into two categories:
+
+| Category | Count | Availability | Operations |
+|----------|-------|--------------|------------|
+| **Read-Only Tools** | 17 | Always enabled | `get`, `search`, `lookup` — safe exploration |
+| **Modification Tools** | 26 | Requires `ALLOW_MODIFICATIONS=true` | `create`, `update`, `patch`, `delete` — data changes |
+
+### Enabling Modifications
+
+To allow modification tools, update the systemd service environment:
+
+```bash
+# Edit the service file
+sudo nano /etc/systemd/system/tdx-mcp.service
+
+# Change this line:
+# Environment="ALLOW_MODIFICATIONS=false"
+# To:
+# Environment="ALLOW_MODIFICATIONS=true"
+
+# Save and reload
+sudo systemctl daemon-reload
+sudo systemctl restart tdx-mcp
+```
+
+Or modify the `.env` file:
+```bash
+sudo nano /opt/tdx-mcp/.env
+# Add or change: ALLOW_MODIFICATIONS=true
+sudo systemctl restart tdx-mcp
+```
+
+### Verifying Tool Availability
+
+Check which tools are registered:
+```bash
+# View service logs for tool registration
+sudo journalctl -u tdx-mcp --since='5 minutes ago' | grep -E 'Registering|registered'
+```
+
+Look for output like:
+```
+[TDX-MCP] Registering ticket read-only tools...
+[TDX-MCP] Ticket read-only tools registered successfully!
+[TDX-MCP] Registering ticket modification tools...
+```
+
+### Safety Recommendations
+
+1. **Initial Deployment**: Always start with `ALLOW_MODIFICATIONS=false`
+2. **Test Phase**: Verify read-only tools work correctly (ticket search, asset lookup, etc.)
+3. **Enable Modifications**: Only enable after confirming read-only tools are functional
+4. **Monitor Changes**: Keep audit logs when modifications are enabled
 
 ### View Service File
 ```bash
