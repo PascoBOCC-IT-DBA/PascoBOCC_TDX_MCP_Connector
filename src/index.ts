@@ -4,19 +4,22 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { loadConfig } from "./config.js";
 import { TdxClient } from "./tdx-client.js";
-import { registerTicketTools } from "./tools/tickets.js";
+import { registerTicketTools, registerTicketReadOnlyTools } from "./tools/tickets.js";
 import { registerAssetTools } from "./tools/assets.js";
 import { registerCmdbTools } from "./tools/cmdb.js";
 import { registerKbTools } from "./tools/kb.js";
-import { registerPeopleTools } from "./tools/people.js";
 import { registerProjectTools } from "./tools/projects.js";
+import { registerPeopleTools } from "./tools/people.js";
 import { registerAccountTools } from "./tools/accounts.js";
 import { registerGroupTools } from "./tools/groups.js";
 import { registerAttributeTools } from "./tools/attributes.js";
 import { registerStatusTools } from "./tools/statuses.js";
 
+console.error("[TDX-MCP] Process started");
 const config = loadConfig();
+console.error("[TDX-MCP] Config loaded");
 const client = new TdxClient(config);
+console.error("[TDX-MCP] TDX client created");
 
 const server = new McpServer({
   name: "tdx-mcp",
@@ -48,6 +51,11 @@ registerIfAllowed(
   () => registerTicketTools(server, client),
   "registerTicketTools"
 );
+// Ticket read-only tools always enabled
+console.error("[TDX-MCP] Registering ticket read-only tools...");
+registerTicketReadOnlyTools(server, client);
+console.error("[TDX-MCP] Ticket read-only tools registered successfully!");
+
 registerIfAllowed(
   () => registerAssetTools(server, client),
   "registerAssetTools"
@@ -71,6 +79,13 @@ registerAccountTools(server, client);
 registerGroupTools(server, client);
 registerAttributeTools(server, client);
 registerStatusTools(server, client);
+console.error("[TDX-MCP] All tool registrations complete, creating transport...");
 
 const transport = new StdioServerTransport();
+console.error("[TDX-MCP] Transport created, calling server.connect()...");
 await server.connect(transport);
+console.error("[TDX-MCP] server.connect() complete!");
+
+// Signal to HTTP wrapper that this process is fully initialized with all tools
+console.log("[MCP Server Ready]");
+console.error("[TDX-MCP] Emitted MCP Server Ready signal");

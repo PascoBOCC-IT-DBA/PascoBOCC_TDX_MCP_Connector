@@ -158,9 +158,11 @@ class MCPServerPool {
         resolve(null);
       });
 
-      // Wait for first output indicating process is ready
-      const onData = () => {
-        if (!readyReceived) {
+      // Wait for the specific "[MCP Server Ready]" message indicating process is fully initialized
+      const onData = (data: Buffer) => {
+        const dataStr = data.toString().trim();
+        console.log(`[MCP Pool] Received data from child: "${dataStr}"`);
+        if (!readyReceived && data.toString().includes('[MCP Server Ready]')) {
           readyReceived = true;
           proc.stdout.removeListener('data', onData);
           console.log(`[MCP Pool] Process ready (PID: ${proc.pid})`);
