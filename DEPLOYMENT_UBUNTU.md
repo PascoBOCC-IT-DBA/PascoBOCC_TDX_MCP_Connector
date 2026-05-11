@@ -1,10 +1,10 @@
 # Ubuntu Deployment Guide - TDX MCP Connector
 
 ## Overview
-This guide walks you through deploying the TDX MCP Connector to Ubuntu 26.04 LTS with systemd service management.
+This guide walks you through deploying the TDX MCP Connector to Ubuntu 24.04 LTS with systemd service management.
 
 ## Prerequisites
-- Ubuntu 26.04 LTS server with SSH access
+- Ubuntu 24.04 LTS server with SSH access
 - sudo privileges on the server
 - Your project files and .env configuration
 
@@ -104,7 +104,7 @@ WorkingDirectory=/opt/tdx-mcp
 Environment="NODE_ENV=production"
 Environment="MCP_HTTP_PORT=3000"
 Environment="MCP_API_KEY=your-secure-api-key-here"
-ExecStart=/usr/bin/node /opt/tdx-mcp/src/http-wrapper.js
+ExecStart=/usr/bin/node /opt/tdx-mcp/dist/http-wrapper.js
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal
