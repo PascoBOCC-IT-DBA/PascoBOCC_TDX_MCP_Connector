@@ -1,22 +1,22 @@
 # TDX MCP HTTP Server - Copilot Studio Integration
 
 ## Status
-✅ **Server is running and ready for Copilot Studio integration**
-🔐 **API Key Authentication: ACTIVE** (All endpoints except `/health` require authentication)
+✅ **Server is deployed and ready for Copilot Studio integration**
+🔐 **Entra/Azure Authentication: ACTIVE** (All endpoints except `/health` require authentication)
 📊 **Available Tools**: 43 tools across 10 domains
 
 ## Service Details
-- **Status**: Active (running)
-- **Port**: 3000
-- **Server**: 10.210.1.38
-- **User**: tdx-mcp
-- **Service**: systemd (tdx-mcp.service)
+- **Status**: Active (deployed)
+- **Deployment Platform**: Azure [specify: App Service/AKS/Container Instances/other]
+- **Private URL**: https://[YOUR_PRIVATE_URL]
+- **Authentication**: Entra/Azure OAuth 2.0
+- **Service**: Managed cloud service
 
 ## HTTP Endpoints
 
 ### Health Check
 ```
-GET http://10.210.1.38:3000/health
+GET https://[YOUR_PRIVATE_URL]/health
 ```
 Response:
 ```json
@@ -29,14 +29,14 @@ Response:
 
 ### Service Status
 ```
-GET http://10.210.1.38:3000/status
+GET https://[YOUR_PRIVATE_URL]/status
+Authorization: Bearer {ACCESS_TOKEN}
 ```
 Response:
 ```json
 {
   "service": "TDX MCP HTTP Wrapper",
   "version": "1.0.0",
-  "port": "3000",
   "uptime": 29.54,
   "timestamp": "2026-05-07T15:22:17.460Z"
 }
@@ -44,7 +44,8 @@ Response:
 
 ### List Available Tools
 ```
-GET http://10.210.1.38:3000/tools
+GET https://[YOUR_PRIVATE_URL]/tools
+Authorization: Bearer {ACCESS_TOKEN}
 ```
 Response:
 ```json
@@ -88,9 +89,9 @@ Response:
 
 **POST /mcp** - Direct MCP JSON-RPC endpoint for tool invocation
 ```
-POST http://10.210.1.38:3000/mcp
+POST https://[YOUR_PRIVATE_URL]/mcp
 Content-Type: application/json
-Authorization: Bearer YOUR_API_KEY
+Authorization: Bearer {ACCESS_TOKEN}
 
 {
   "jsonrpc": "2.0",
@@ -130,17 +131,14 @@ Authorization: Bearer YOUR_API_KEY
 }
 ```
 
-## API Key Authentication
+## Entra/Azure Authentication
 
-### Current Configuration
-✅ **API Key is ACTIVE and deployed**
+### OAuth 2.0 Configuration
+✅ **OAuth 2.0 / OIDC is ACTIVE and deployed**
 
-**Your API Key:**
-```
-226ee1edd38aea72c27c62e44d0d4edb101a97922568db6db77036f83fbcebde
-```
+The MCP service is now secured with Entra/Azure authentication using OAuth 2.0 / OpenID Connect (OIDC).
 
-**Protected Endpoints** (require API key):
+**Protected Endpoints** (require valid Azure AD access token):
 - `GET /status`
 - `GET /tools`
 - `POST /mcp`
@@ -148,114 +146,156 @@ Authorization: Bearer YOUR_API_KEY
 **Public Endpoints** (no authentication):
 - `GET /health` (for load balancers and health checks)
 
-### API Key Expiration
-**❌ The MCP_API_KEY does NOT expire**
-- This is a static authentication token configured in the systemd service
-- It persists across service restarts and server reboots
-- It only changes if you manually update it in the systemd service file
+### Azure App Registration Details
+Your application is registered in Azure Entra with the following details:
 
-**Note**: This is different from the TDX API tokens in your `.env` file, which expire after 24 hours. The MCP wrapper automatically refreshes those tokens, so you don't need to worry about them.
+- **Application Name**: TDX MCP Connector
+- **Application ID**: [YOUR_APP_ID]
+- **Tenant ID**: [YOUR_TENANT_ID]
+- **Resource URI**: https://[YOUR_PRIVATE_URL]
+- **Redirect URI**: https://[YOUR_PRIVATE_URL]/auth/callback (if applicable)
 
-### To Change the API Key
+### Obtaining an Access Token
 
-You may want to rotate your API key for security reasons:
-- If you suspect the key has been compromised
-- On a regular security rotation schedule
-- When changing Copilot Studio configurations
+#### For Copilot Studio
+Copilot Studio will automatically handle token acquisition:
+1. Configure the OAuth connection in Copilot Studio settings (see Copilot Studio Configuration section below)
+2. Specify your Azure AD application credentials
+3. Copilot will request tokens on behalf of your application
 
-**Steps to rotate the key:**
+#### For Manual API Testing
 
-1. **Generate a new secure key:**
+**Using Azure CLI:**
 ```bash
-openssl rand -hex 32
+az account get-access-token \
+  --resource https://[YOUR_PRIVATE_URL] \
+  --scope [YOUR_APP_ID]/.default
 ```
 
-2. **Update the service file:**
+**Using cURL with Client Credentials:**
 ```bash
-ssh itmcp@10.210.1.38 "sudo nano /etc/systemd/system/tdx-mcp.service"
+curl -X POST \
+  "https://login.microsoftonline.com/[TENANT_ID]/oauth2/v2.0/token" \
+  -d "client_id=[YOUR_APP_ID]" \
+  -d "client_secret=[YOUR_CLIENT_SECRET]" \
+  -d "scope=[YOUR_APP_ID]/.default" \
+  -d "grant_type=client_credentials"
 ```
 
-3. **Find and update this line in the `[Service]` section:**
-```ini
-Environment="MCP_API_KEY=your-new-key-here"
+Response includes:
+```json
+{
+  "access_token": "eyJ0eXAiOiJKV1QiLCJhbGc...",
+  "token_type": "Bearer",
+  "expires_in": 3600
+}
 ```
 
-4. **Restart the service:**
+### Using Access Token in Requests
+
+Once obtained, include the access token in the `Authorization` header:
+
+**With cURL:**
 ```bash
-ssh itmcp@10.210.1.38 "sudo systemctl daemon-reload && sudo systemctl restart tdx-mcp"
-```
-
-5. **Update Copilot Studio** with the new key in the Authorization header
-
-### Use API Key in Requests
-
-Once enabled, all authenticated endpoints require the API key in the `Authorization` header:
-
-**With curl:**
-```bash
-curl -H "Authorization: Bearer 226ee1edd38aea72c27c62e44d0d4edb101a97922568db6db77036f83fbcebde" \
-  http://10.210.1.38:3000/status
+curl -H "Authorization: Bearer {ACCESS_TOKEN}" \
+  https://[YOUR_PRIVATE_URL]/status
 ```
 
 **In Copilot Studio:**
-Add this header to all authenticated requests:
-```
-Authorization: Bearer 226ee1edd38aea72c27c62e44d0d4edb101a97922568db6db77036f83fbcebde
-```
+The authorization header is automatically added by the OAuth connector you configure.
 
-**Example MCP request with API key:**
+**Example MCP request with Azure access token:**
 ```
-POST http://10.210.1.38:3000/mcp
+POST https://[YOUR_PRIVATE_URL]/mcp
 Content-Type: application/json
-Authorization: Bearer 226ee1edd38aea72c27c62e44d0d4edb101a97922568db6db77036f83fbcebde
+Authorization: Bearer {ACCESS_TOKEN}
 
 {
-  "method": "tickets_query",
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
   "params": {
-    "query": "status:open"
+    "name": "tdx-ticket-search",
+    "arguments": {
+      "statusIds": [896],
+      "maxResults": 10
+    }
   }
 }
 ```
 
-### Generate a New API Key
+### Token Expiration & Refresh
+- **Access Token Lifetime**: 1 hour (default)
+- **Refresh Token Lifetime**: 24 hours
+- **Copilot Studio**: Automatically handles token refresh via the OAuth connection
+- **Manual Testing**: Request a new token when your current token expires
 
-If you need to generate a new secure API key for rotation or security reasons:
+### Client Credentials (Application Secrets)
 
-**On Ubuntu:**
-```bash
-openssl rand -hex 32
-```
+For Copilot Studio to authenticate as your application, you'll need:
 
-**Example output:**
-```
-a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6
-```
+1. **Client ID** (Application ID): [YOUR_APP_ID]
+2. **Client Secret**: [Create in Azure Portal → App Registration → Certificates & secrets]
+3. **Tenant ID**: [YOUR_TENANT_ID]
 
-Then update your service file with the new key (see "To Change the API Key" section above).
+**⚠️ Security Note**: Keep your Client Secret secure:
+- Never commit it to version control
+- Store it in Azure Key Vault for production
+- Rotate periodically (annually recommended)
+- Use managed identities when possible instead of client secrets
+
+### API Permissions
+
+The application requires the following API permissions in Azure Entra:
+- **Microsoft Graph API**: User.Read (delegated) - if using user context
+- **Custom API** (your TDX MCP service): Access to protected endpoints
+
+Configure these in Azure Portal → App Registration → API Permissions.
 
 ## Copilot Studio Configuration
 
-### Step 1: Add Custom Connector
+### Step 1: Create OAuth Connection in Copilot Studio
 In Copilot Studio:
+1. Go to **Connections** (or **Settings** → **Connections**)
+2. Click **Create New Connection**
+3. Select **Azure AD** or **OAuth 2.0**
+4. Fill in the following details:
+   - **Connection Name**: `TDX MCP OAuth`
+   - **Client ID**: [YOUR_APP_ID]
+   - **Client Secret**: [YOUR_CLIENT_SECRET]
+   - **Tenant ID**: [YOUR_TENANT_ID]
+   - **Authorization URL**: `https://login.microsoftonline.com/[YOUR_TENANT_ID]/oauth2/v2.0/authorize`
+   - **Token URL**: `https://login.microsoftonline.com/[YOUR_TENANT_ID]/oauth2/v2.0/token`
+   - **Scope**: `[YOUR_APP_ID]/.default`
+
+### Step 2: Add Custom Connector
 1. Go to **Plugins**
 2. Click **+ Create a plugin**
 3. Select **Connect to web service**
-4. Name: `TDX MCP Connector`
-
-### Step 2: Configure Authentication (if needed)
-- Auth type: `API Key` (if adding auth layer)
-- Endpoint base URL: `http://10.210.1.38:3000`
+4. Configure:
+   - **Name**: `TDX MCP Connector`
+   - **Base URL**: `https://[YOUR_PRIVATE_URL]`
+   - **Authentication**: Select the OAuth connection you created above
 
 ### Step 3: Create Actions
-Create actions for each tool:
+Create actions for each tool you need. Example actions:
 
 **Example: Query Tickets**
 ```
 POST /mcp
+Content-Type: application/json
+Authorization: Bearer {connection.token}
+
 {
-  "method": "tickets_query",
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
   "params": {
-    "query": "<user_input>"
+    "name": "tdx-ticket-search",
+    "arguments": {
+      "statusIds": [<status_id>],
+      "maxResults": <max_results>
+    }
   }
 }
 ```
@@ -263,125 +303,243 @@ POST /mcp
 **Example: Create Ticket**
 ```
 POST /mcp
+Content-Type: application/json
+Authorization: Bearer {connection.token}
+
 {
-  "method": "tickets_create",
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
   "params": {
-    "title": "<title>",
-    "description": "<description>",
-    "status": "<status>"
+    "name": "tdx-ticket-create",
+    "arguments": {
+      "title": "<title>",
+      "description": "<description>",
+      "statusId": <status_id>
+    }
   }
 }
 ```
 
-## Service Management
+## Service Management (Azure Deployment)
 
-### Check Service Status
-```bash
-ssh itmcp@10.210.1.38 "sudo systemctl status tdx-mcp"
-```
+### Check Service Health
+- **Azure Portal**: Navigate to your App Service → Health Check
+- **Health Endpoint**: `GET https://[YOUR_PRIVATE_URL]/health`
 
-### View Logs
+### View Application Logs
+- **Azure Portal**: App Service → Log stream
+- **Azure Monitor**: Application Insights (if enabled)
+- **Azure CLI**:
 ```bash
-ssh itmcp@10.210.1.38 "sudo journalctl -u tdx-mcp -f"
+az webapp log tail --name [APP_NAME] --resource-group [RESOURCE_GROUP]
 ```
 
 ### Restart Service
+- **Azure Portal**: App Service → Restart
+- **Azure CLI**:
 ```bash
-ssh itmcp@10.210.1.38 "sudo systemctl restart tdx-mcp"
+az webapp restart --name [APP_NAME] --resource-group [RESOURCE_GROUP]
 ```
 
-### Stop Service
+### Stop/Start Service
+**Stop:**
 ```bash
-ssh itmcp@10.210.1.38 "sudo systemctl stop tdx-mcp"
+az webapp stop --name [APP_NAME] --resource-group [RESOURCE_GROUP]
 ```
 
-### Start Service
+**Start:**
 ```bash
-ssh itmcp@10.210.1.38 "sudo systemctl start tdx-mcp"
+az webapp start --name [APP_NAME] --resource-group [RESOURCE_GROUP]
 ```
+
+### Scaling & Performance
+- **Azure Portal**: Scale up/out under Settings
+- **Auto-scale**: Configure based on CPU, memory, or custom metrics
+- **App Service Plan**: Adjust tier if needed for performance requirements
 
 ## Network Configuration
 
-### Port 3000 Access
-If accessing from remote machines:
+### Private URL Access
+The service is deployed with a private URL and secured with Entra/Azure authentication:
+- **Public endpoint**: Not directly exposed (authentication required)
+- **Private URL**: `https://[YOUR_PRIVATE_URL]`
+- **HTTPS**: Enforced (automatic certificate management via Azure)
+- **Network security**: Azure Private Endpoints (optional, for additional isolation)
 
-**Option 1: SSH Tunnel (Secure)**
+### Accessing the Service
+
+**Option 1: Copilot Studio** (Recommended)
+- Configure the OAuth connection in Copilot Studio
+- Copilot will automatically authenticate and call the private URL
+- No manual token management needed
+
+**Option 2: Azure CLI with OAuth**
 ```bash
-ssh -L 3000:localhost:3000 itmcp@10.210.1.38
+az account get-access-token --scope [YOUR_APP_ID]/.default
+# Use the returned token in Authorization: Bearer header
 ```
 
-**Option 2: Open Firewall (if needed)**
-```bash
-sudo ufw allow 3000/tcp
-```
+**Option 3: Azure Private Endpoint** (for additional security)
+- Configure a Private Endpoint in Azure Portal
+- Restrict access to specific VNets
+- Traffic never traverses the public internet
+
+### Firewall & Network Policy
+- **Azure Firewall** (optional): Can be configured to control inbound/outbound traffic
+- **Network Security Groups (NSG)**: Configure if using VNets
+- **CORS**: Configured for Copilot Studio domain
+- **TLS/SSL**: Enforced (Azure-managed certificates)
 
 ## Troubleshooting
 
-### Service Not Starting
+### Service Not Accessible
+1. Check Azure Portal: App Service → Health check → Status
+2. Verify authentication token is valid
+3. Check Application Insights for errors
+4. Verify the private URL is correct: `https://[YOUR_PRIVATE_URL]`
+
 ```bash
-ssh itmcp@10.210.1.38 "sudo journalctl -u tdx-mcp -n 50"
+# Test health endpoint (no auth required)
+curl https://[YOUR_PRIVATE_URL]/health
+
+# Test protected endpoint (with token)
+curl -H "Authorization: Bearer {ACCESS_TOKEN}" \
+  https://[YOUR_PRIVATE_URL]/status
 ```
 
-### Health Check Fails
+### Authentication Failures
+- **Invalid token**: Obtain a new access token
+- **Expired token**: Request a new token (auto-handled by Copilot)
+- **Invalid credentials**: Verify Client ID, Client Secret, Tenant ID in Azure Portal
+- **Insufficient permissions**: Check API Permissions in App Registration → API Permissions
+
+### Access Token Issues
 ```bash
-ssh itmcp@10.210.1.38 "curl -v http://localhost:3000/health"
+# Request a new token
+az account get-access-token --scope [YOUR_APP_ID]/.default
+
+# Decode token to check expiration
+# Use https://jwt.io and paste your token to inspect claims
 ```
 
 ### MCP Endpoint Not Responding
-```bash
-ssh itmcp@10.210.1.38 "sudo systemctl restart tdx-mcp && sleep 2 && curl http://localhost:3000/health"
+1. Check Azure Monitor → Application Insights
+2. Verify application is running: `az webapp show --name [APP_NAME] --resource-group [RESOURCE_GROUP]`
+3. Check logs: `az webapp log tail --name [APP_NAME] --resource-group [RESOURCE_GROUP]`
+4. Restart service if needed: `az webapp restart --name [APP_NAME] --resource-group [RESOURCE_GROUP]`
+
+### Network Connectivity Issues
+- If using Private Endpoints, verify VNet connectivity
+- Check Azure Firewall rules if configured
+- Verify Network Security Groups (NSG) allow HTTPS (port 443)
+- Confirm Copilot Studio can reach the private URL
+
+### Debugging with Application Insights
+Enable Application Insights in Azure Portal for detailed diagnostics:
+- **Requests**: See all API calls
+- **Failures**: Track errors
+- **Exceptions**: Detailed error logs
+- **Performance**: Response time analytics
+
+Example query:
+```kusto
+requests
+| where name contains "mcp"
+| where tostring(customDimensions.status) != "200"
+| project timestamp, name, resultCode, duration
 ```
 
 ## Integration Notes
 
+- **Authentication**: Entra/Azure OAuth 2.0 with OIDC
+- **Token lifetime**: 1 hour (access token) / 24 hours (refresh token)
 - **Process Pooling**: HTTP wrapper maintains a pool of warm MCP processes for fast response times
-- **Process Management**: Each request uses an available process from the pool (max 5 concurrent)
-- **Request Timeout**: 10 seconds per request via `/mcp` endpoint, 30 seconds via HTTP transport
-- **CORS**: Enabled for cross-origin requests from any origin
+- **Process Management**: Each request uses an available process from the pool (max concurrent configurable)
+- **Request Timeout**: 10 seconds per request via `/mcp` endpoint
+- **CORS**: Configured for Copilot Studio domain
 - **Response Format**: All `/mcp` responses transformed into agent-friendly JSON with metadata
-- **API Key**: Static, non-expiring authentication token - persists across restarts
+- **Deployment**: Azure managed service (App Service/AKS/Containers)
+- **Certificates**: Automatic TLS/SSL via Azure
+- **Network**: Private URL with authentication-based access control
 
 ## HTTP Endpoints Summary
 
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
 | `/health` | GET | No | Health check (returns status, uptime) |
-| `/status` | GET | Yes | Service status and version |
-| `/tools` | GET | Yes | List all 43 available tools |
-| `/mcp` | POST | Yes | Direct MCP JSON-RPC tool invocation |
-| `/` | GET | Yes | MCP-over-HTTP SSE connection |
-| `/` | POST | Yes | MCP-over-HTTP request/response |
+| `/status` | GET | OAuth 2.0 | Service status and version |
+| `/tools` | GET | OAuth 2.0 | List all 43 available tools |
+| `/mcp` | POST | OAuth 2.0 | Direct MCP JSON-RPC tool invocation |
+| `/` | GET | OAuth 2.0 | MCP-over-HTTP SSE connection |
+| `/` | POST | OAuth 2.0 | MCP-over-HTTP request/response |
 
-## Environment Variables
+## Environment Variables & Configuration
 
-Available environment variables:
-- `MCP_HTTP_PORT` - HTTP server port (default: 3000)
-- `MCP_API_KEY` - API key for authentication (generated during setup)
+Available environment variables (typically configured in Azure App Settings):
+
+**Deployment Configuration:**
 - `NODE_ENV` - Environment mode (default: production)
+- `MCP_HTTP_PORT` - HTTP server port (default: 3000, managed by Azure)
+
+**Azure Authentication:**
+- `AZURE_TENANT_ID` - Entra/Azure tenant ID
+- `AZURE_CLIENT_ID` - Application (client) ID
+- `AZURE_CLIENT_SECRET` - Application client secret
+- `AZURE_AUTHORITY_URL` - Authorization endpoint (default: https://login.microsoftonline.com)
+
+**TDX API Configuration:**
 - `TDX_BASE_URL` - TeamDynamix API base URL
 - `TDX_BEID` - TeamDynamix Business Edition ID
 - `TDX_WEB_SERVICES_KEY` - TeamDynamix API key
 - `TDX_APP_ID` - Default TDX App ID for service requests
 - `TDX_ASSETS_APP_ID` - TDX App ID for asset requests
 - `TDX_KB_APP_ID` - TDX App ID for knowledge base requests
-- `MCP_API_KEY` - HTTP wrapper API key for request authentication (never expires, only changes if manually updated)
-- `NODE_ENV` - Set to "production" for the service
 
 **Note on credential management:**
-- **MCP_API_KEY**: HTTP wrapper authentication - permanent unless manually rotated
-- **TDX API credentials** (in .env): Auto-refresh every 24 hours - no manual action needed
+- **Azure credentials** (Client ID, Secret, Tenant ID): Stored securely in Azure Key Vault or App Settings
+  - Never commit to version control
+  - Rotate secrets periodically (annually recommended)
+  - Use managed identities when possible
+- **TDX API credentials**: Auto-refresh every 24 hours - no manual action needed
+- **Access tokens**: Automatically issued and refreshed by Copilot Studio via OAuth flow
+
+### Secure Configuration Best Practices
+1. Use Azure Key Vault to store secrets
+2. Reference Key Vault secrets in App Settings
+3. Enable managed identity for the App Service
+4. Use role-based access control (RBAC) for permissions
+5. Enable audit logging in Azure Monitor
+
+## Deployment Checklist
+
+Before going live with Copilot Studio integration:
+
+1. ✅ **Azure App Service Deployed** - Service running on private URL
+2. ✅ **Entra/Azure Authentication Configured** - OAuth 2.0 app registration complete
+3. ✅ **Private URL Secured** - HTTPS enforced with Azure-managed certificate
+4. ✅ **Application Secrets Stored** - Client ID, Secret, Tenant ID in Azure Key Vault
+5. **Configure Copilot Studio** - Create OAuth connection and actions (see Copilot Studio Configuration section)
+6. **Test Connectivity** - Verify Copilot can authenticate and call the MCP service
+7. **Test Tool Invocations** - End-to-end testing of each action
+8. **Monitor & Alert** - Enable Application Insights and configure alerts
+9. **Document & Train** - Update agent prompt documentation with available tools
+10. **Go Live** - Publish actions to Copilot agents
 
 ## Next Steps
 
-1. ✅ **API Key Authentication** - Already configured and active
-2. **Configure Copilot Studio** with the HTTP endpoints (see Copilot Studio Configuration section above)
-3. **Test connectivity** from Copilot to the MCP service using the API key
-4. **Create agent actions** for each tool you need
-5. **Test tool invocations** end-to-end from Copilot Studio
+1. **Azure Deployment** - Deploy application to Azure using preferred method (App Service, AKS, Containers)
+2. **Azure Entra Setup** - Create app registration and obtain credentials
+3. **Configure App Settings** - Set all required environment variables in Azure
+4. **Configure Copilot Studio** - Create OAuth connection with Azure credentials
+5. **Create Agent Actions** - Add actions for each TDX tool you need
+6. **Test Integration** - Verify end-to-end connectivity and token flow
+7. **Enable Monitoring** - Set up Application Insights alerts and dashboards
 
-## Support
+## Support & Documentation
 
 For issues, check:
-- Service logs: `sudo journalctl -u tdx-mcp -f`
-- Configuration: `/opt/tdx-mcp/.env`
-- HTTP wrapper source: `/opt/tdx-mcp/src/http-wrapper.js`
+- **Azure Portal**: App Service logs and Application Insights
+- **Copilot Studio**: Check connection status and action definitions
+- **Entra/Azure AD**: Verify app registration and API permissions
+- **Documentation**: Reference API_RESPONSE_SCHEMA.md and README.md
