@@ -6,55 +6,6 @@ This server exposes **43 tools** across **10 domains** — tickets, assets, CMDB
 
 ## Quick Start
 
-### Production Server Status
-
-✅ **Server:** Deployed and running  
-✅ **Status:** Stable & Operational  
-✅ **Tools:** 43 total (17 read-only enabled, 26 modification disabled)  
-✅ **Auth:** Bearer token required
-
-> **Note:** Server address and API key are maintained separately. Contact your system administrator for access credentials.  
-
-### Verify Server is Working
-
-```powershell
-# Health check (no auth needed)
-Invoke-WebRequest http://<SERVER_ADDRESS>:3000/health
-
-# Get tool list (requires auth - replace placeholders with your values)
-$serverAddress = "<SERVER_ADDRESS>:3000"
-$apiKey = "<YOUR_API_KEY>"
-$h = @{"Authorization"="Bearer $apiKey"}
-Invoke-WebRequest http://$serverAddress/tools -Headers $h
-```
-
-> **Note:** Replace `<SERVER_ADDRESS>` and `<YOUR_API_KEY>` with values from your system administrator.
-
-### Quick Testing Examples
-
-```powershell
-# Create reusable test function
-function Test-TdxTool {
-    param([string]$ToolName, [hashtable]$Params = @{})
-    $serverAddress = "<SERVER_ADDRESS>:3000"  # Replace with your server
-    $apiKey = "<YOUR_API_KEY>"                # Replace with your API key
-    $headers = @{"Authorization"="Bearer $apiKey";"Content-Type"="application/json"}
-    $body = @{jsonrpc="2.0";method=$ToolName;params=$Params;id=1} | ConvertTo-Json -Depth 10
-    try {
-        Invoke-RestMethod -Uri "http://$serverAddress/mcp" -Method POST -Headers $headers -Body $body -TimeoutSec 90
-    } catch {
-        Write-Host "❌ Error: $($_.Exception.Message)" -ForegroundColor Red
-    }
-}
-
-# Examples (after setting server address and API key above):
-Test-TdxTool -ToolName "tdx-ticket-search" -Params @{maxResults=3}
-Test-TdxTool -ToolName "tdx-ticket-get" -Params @{id=4734783}
-Test-TdxTool -ToolName "tdx-statuses-get" -Params @{componentType="tickets"}
-Test-TdxTool -ToolName "tdx-asset-search" -Params @{maxResults=5}
-Test-TdxTool -ToolName "tdx-people-lookup" -Params @{uID="j.boswell"}
-```
-
 ### Local Development Setup
 
 1. **Install dependencies and build**
@@ -67,17 +18,6 @@ Test-TdxTool -ToolName "tdx-people-lookup" -Params @{uID="j.boswell"}
    - Copy `.env.example` to `.env` and add your TDX credentials
 
 3. **For production deployment**, see [DEPLOYMENT_UBUNTU.md](DEPLOYMENT_UBUNTU.md) for Ubuntu server setup and [COPILOT_INTEGRATION.md](COPILOT_INTEGRATION.md) for Copilot Studio integration
-
-## Authentication
-
-This server uses TDX **admin token authentication** (`POST /auth/loginadmin`) with a BEID and Web Services Key — not username/password. These are API-specific service account keys that are:
-
-- Not tied to SSO or any user's credentials
-- Generated in **TDAdmin > Organization Details > API Settings**
-- Revocable independently without affecting user accounts
-- Accessible to any admin with the "Add BE Administrators" permission
-
-Tokens are fetched lazily on the first tool call and auto-refreshed after 23 hours (1-hour buffer before the 24-hour TDX expiry).
 
 ## Tool Availability & Safety-by-Default Design
 
@@ -271,17 +211,9 @@ Common `componentId` values for `tdx-attributes-get`: `9` = Ticket, `27` = Asset
 
 ## Deployment
 
-### Production (Ubuntu Server)
-
-For deploying as a persistent HTTP service with API key authentication:
-
-1. See [DEPLOYMENT_UBUNTU.md](DEPLOYMENT_UBUNTU.md) for Ubuntu server setup
-2. See [COPILOT_INTEGRATION.md](COPILOT_INTEGRATION.md) for Copilot Studio integration
-
-The HTTP wrapper (`src/http-wrapper.ts`) spawns MCP server processes on-demand and exposes them via REST endpoints, allowing:
-- Persistent service with systemd auto-restart
-- API key authentication support
-- Integration with Microsoft Copilot Studio
+For deployment instructions, see:
+- [DEPLOYMENT_UBUNTU.md](DEPLOYMENT_UBUNTU.md) for server deployment
+- [COPILOT_INTEGRATION.md](COPILOT_INTEGRATION.md) for AI client integration
 
 ## Documentation
 
@@ -293,26 +225,7 @@ The HTTP wrapper (`src/http-wrapper.ts`) spawns MCP server processes on-demand a
 | **[DEPLOYMENT_UBUNTU.md](DEPLOYMENT_UBUNTU.md)** | Ubuntu server deployment, systemd service setup, and production configuration |
 | **[COPILOT_INTEGRATION.md](COPILOT_INTEGRATION.md)** | GitHub Copilot Chat and Microsoft Copilot Studio integration instructions |
 
-### Testing Status
-
-✅ **5 Tools Extensively Tested:** tdx-ticket-search, tdx-ticket-get, tdx-ticket-feed-get, tdx-statuses-get, tdx-attributes-get  
-✅ **17 Read-Only Tools:** All enabled and ready for use  
-✅ **26 Modification Tools:** Safely disabled (set `ALLOW_MODIFICATIONS=true` in .env to enable)  
-✅ **Infrastructure:** Verified stable (5+ minute uptime, no concurrency errors)
-
-See [TDX_MCP_TOOLS_COMPLETE_REFERENCE.md](TDX_MCP_TOOLS_COMPLETE_REFERENCE.md) for complete testing results and all tool documentation.
-- Process pooling for efficiency
-
-### Local Development (Stdio Mode)
-
-For local development, build and run directly:
-
-```bash
-npm run build
-npm start
-```
-
-The stdio server will be available for integration with VS Code, Cline, or other MCP clients.
+For complete tool documentation and reference information, see [TDX_MCP_TOOLS_COMPLETE_REFERENCE.md](TDX_MCP_TOOLS_COMPLETE_REFERENCE.md).
 
 ## Example Usage
 
