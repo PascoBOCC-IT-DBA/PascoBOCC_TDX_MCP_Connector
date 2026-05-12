@@ -1,4 +1,4 @@
-# TDX MCP HTTP Server - Copilot Studio Integration
+# TDX MCP HTTP Server - Example Copilot Studio Integration
 
 ## Status
 ✅ **Server is deployed and ready for Copilot Studio integration**
