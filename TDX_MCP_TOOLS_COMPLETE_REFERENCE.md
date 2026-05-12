@@ -394,63 +394,38 @@ Returns array of feed entries:
 ---
 
 ## tdx-ticket-create
-**Status:** 🟡 NOT TESTED  
+**Status:** � DISABLED (Modification Tool - ALLOW_MODIFICATIONS=false)  
 **Source:** src/tools/tickets.ts (lines 109-179)
 
 ### Overview
 Creates a new ticket in TeamDynamix.
 
-### Parameters (from source code)
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `title` | string | YES | Ticket title |
-| `description` | string | NO | Ticket description/details |
-| `accountId` | integer | NO | Account/department ID |
-| `statusId` | integer | NO | Status ID |
-| `priorityId` | integer | NO | Priority ID |
-| `typeId` | integer | NO | Ticket type ID |
-| `requestorUid` | string | NO | Requestor person UID |
-| `responsibleGroupId` | integer | NO | Responsible group ID |
-| `responsibleUid` | string | NO | Responsible person UID |
-| `estimatedMinutes` | integer | NO | Estimated time to resolve |
-| `customAttributes` | object | NO | Custom field values |
-| `appId` | integer | NO | Application ID |
-
-### Return Structure
-(Expected) Returns created ticket object with generated ID and default values.
-
 ### Status
-🔄 PENDING: Needs testing with valid create parameters
+🔴 DISABLED: Modification tools disabled for safety. Enable via ALLOW_MODIFICATIONS environment variable only in authorized environments.
 
 ---
 
 ## tdx-ticket-update
-**Status:** 🟡 NOT TESTED  
+**Status:** � DISABLED (Modification Tool - ALLOW_MODIFICATIONS=false)  
 **Source:** src/tools/tickets.ts (lines 181-251)
 
 ### Overview
 Fully updates a ticket (all fields must be provided).
 
-### Parameters (from source code)
-Takes complete ticket object with all fields required.
-
 ### Status
-🔄 PENDING: Requires understanding of all required fields
+🔴 DISABLED: Modification tools disabled for safety. Enable via ALLOW_MODIFICATIONS environment variable only in authorized environments.
 
 ---
 
 ## tdx-ticket-patch
-**Status:** 🟡 NOT TESTED  
+**Status:** � DISABLED (Modification Tool - ALLOW_MODIFICATIONS=false)  
 **Source:** src/tools/tickets.ts (lines 253-291)
 
 ### Overview
 Partially updates a ticket (only specified fields are updated).
 
-### Parameters (from source code)
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
+### Status
+🔴 DISABLED: Modification tools disabled for safety. Enable via ALLOW_MODIFICATIONS environment variable only in authorized environments.
 | `id` | integer | Ticket ID to update |
 | `data` | object | Fields to update (PascalCase) |
 | `appId` | integer | Application ID |
@@ -461,76 +436,52 @@ Partially updates a ticket (only specified fields are updated).
 ---
 
 ## tdx-ticket-feed-add
-**Status:** 🟡 NOT TESTED  
+**Status:** � DISABLED (Modification Tool - ALLOW_MODIFICATIONS=false)  
 **Source:** src/tools/tickets.ts (lines 293-312)
 
 ### Overview
 Adds a comment/note to a ticket's activity feed.
 
-### Parameters (from source code)
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `id` | integer | YES | Ticket ID |
-| `body` | string | YES | Comment text |
-| `appId` | integer | NO | Application ID |
-
 ### Status
-🔄 PENDING: Needs testing
+🔴 DISABLED: Modification tools disabled for safety. Enable via ALLOW_MODIFICATIONS environment variable only in authorized environments.
 
 ---
 
 ## tdx-ticket-add-asset
-**Status:** 🟡 NOT TESTED  
+**Status:** � DISABLED (Modification Tool - ALLOW_MODIFICATIONS=false)  
 **Source:** src/tools/tickets.ts (lines 314-333)
 
 ### Overview
 Links an asset to a ticket.
 
-### Parameters (from source code)
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `id` | integer | YES | Ticket ID |
-| `assetId` | integer | YES | Asset ID to link |
-| `appId` | integer | NO | Application ID |
-
 ### Status
-🔄 PENDING: Needs testing
+🔴 DISABLED: Modification tools disabled for safety. Enable via ALLOW_MODIFICATIONS environment variable only in authorized environments.
 
 ---
 
 ## tdx-ticket-add-contact
-**Status:** 🟡 NOT TESTED  
+**Status:** � DISABLED (Modification Tool - ALLOW_MODIFICATIONS=false)  
 **Source:** src/tools/tickets.ts (lines 335-354)
 
 ### Overview
 Adds a contact/person to a ticket.
 
-### Parameters (from source code)
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `id` | integer | YES | Ticket ID |
-| `contactUid` | string | YES | Person UID to add |
-| `appId` | integer | NO | Application ID |
-
 ### Status
-🔄 PENDING: Needs testing
+🔴 DISABLED: Modification tools disabled for safety. Enable via ALLOW_MODIFICATIONS environment variable only in authorized environments.
 
 ---
 
 # ASSETS
 
 ## tdx-asset-create
-**Status:** 🟡 NOT TESTED  
+**Status:** � DISABLED (Modification Tool - ALLOW_MODIFICATIONS=false)  
 **Source:** src/tools/assets.ts
 
 ### Overview
 Creates a new asset in inventory.
 
 ### Status
-🔄 PENDING: Needs testing
+🔴 DISABLED: Modification tools disabled for safety. Enable via ALLOW_MODIFICATIONS environment variable only in authorized environments.
 
 ---
 
@@ -589,38 +540,38 @@ Retrieves full details for a specific asset by ID.
 ---
 
 ## tdx-asset-update
-**Status:** 🟡 NOT TESTED (Modification - Disabled)  
+**Status:** � DISABLED (Modification Tool - ALLOW_MODIFICATIONS=false)  
 **Source:** src/tools/assets.ts
 
 ### Overview
 Fully updates an asset.
 
 ### Status
-🔄 PENDING: Requires ALLOW_MODIFICATIONS=true
+🔴 DISABLED: Modification tools disabled for safety. Enable via ALLOW_MODIFICATIONS environment variable only in authorized environments.
 
 ---
 
 ## tdx-asset-patch
-**Status:** 🟡 NOT TESTED (Modification - Disabled)  
+**Status:** 🔴 DISABLED (Modification Tool - ALLOW_MODIFICATIONS=false)  
 **Source:** src/tools/assets.ts
 
 ### Overview
 Partially updates an asset.
 
 ### Status
-🔄 PENDING: Requires ALLOW_MODIFICATIONS=true
+🔴 DISABLED: Modification tools disabled for safety. Enable via ALLOW_MODIFICATIONS environment variable only in authorized environments.
 
 ---
 
 ## tdx-asset-delete
-**Status:** 🟡 NOT TESTED (Modification - Disabled)  
+**Status:** 🔴 DISABLED (Modification Tool - ALLOW_MODIFICATIONS=false)  
 **Source:** src/tools/assets.ts
 
 ### Overview
 Deletes an asset.
 
 ### Status
-🔄 PENDING: Requires ALLOW_MODIFICATIONS=true
+🔴 DISABLED: Modification tools disabled for safety. Enable via ALLOW_MODIFICATIONS environment variable only in authorized environments.
 
 ---
 
@@ -674,10 +625,14 @@ Searches and filters assets. Similar pattern to ticket/CMDB search.
 ---
 
 ## tdx-asset-feed-add
-**Status:** 🟡 NOT TESTED (Modification - Disabled)  
+**Status:** � DISABLED (Modification Tool - ALLOW_MODIFICATIONS=false)  
 **Source:** src/tools/assets.ts
 
 ### Overview
+Adds a comment/note to an asset's activity feed.
+
+### Status
+🔴 DISABLED: Modification tools disabled for safety. Enable via ALLOW_MODIFICATIONS environment variable only in authorized environments.
 Adds a note/comment to an asset's feed.
 
 ### Status
@@ -738,69 +693,70 @@ Use this to discover:
 # CMDB
 
 ## tdx-cmdb-create
-**Status:** 🟡 NOT TESTED  
+**Status:** � DISABLED (Modification Tool - ALLOW_MODIFICATIONS=false)  
 **Source:** src/tools/cmdb.ts
 
 ### Overview
 Creates a new Configuration Item (CI) in the CMDB.
 
 ### Status
-🔄 PENDING: Needs testing
+🔴 DISABLED: Modification tools disabled for safety. Enable via ALLOW_MODIFICATIONS environment variable only in authorized environments.
 
 ---
 
 ## tdx-cmdb-get
-**Status:** 🟡 NOT TESTED  
+**Status:** ✅ FULLY TESTED (May 12, 2026, 09:53 UTC)  
 **Source:** src/tools/cmdb.ts
 
 ### Overview
-Retrieves details for a specific CI by ID.
+Retrieves details for a specific CI by ID from the TDAssets application.
 
-### Status
-🔄 PENDING: Needs testing
+### Test Results
+✅ PASSED: Successfully retrieved CI data with all attributes
+✅ PASSED: Error handling verified for invalid CI IDs
+✅ Auto-defaults to TDAssets application (no manual configuration needed)
 
 ---
 
 ## tdx-cmdb-update
-**Status:** 🟡 NOT TESTED  
+**Status:** � DISABLED (Modification Tool - ALLOW_MODIFICATIONS=false)  
 **Source:** src/tools/cmdb.ts
 
 ### Overview
 Fully updates a CI.
 
 ### Status
-🔄 PENDING: Needs testing
+🔴 DISABLED: Modification tools disabled for safety. Enable via ALLOW_MODIFICATIONS environment variable only in authorized environments.
 
 ---
 
 ## tdx-cmdb-delete
-**Status:** 🟡 NOT TESTED  
+**Status:** � DISABLED (Modification Tool - ALLOW_MODIFICATIONS=false)  
 **Source:** src/tools/cmdb.ts
 
 ### Overview
 Deletes a CI.
 
 ### Status
-🔄 PENDING: Needs testing
+🔴 DISABLED: Modification tools disabled for safety. Enable via ALLOW_MODIFICATIONS environment variable only in authorized environments.
 
 ---
 
 ## tdx-cmdb-search
-**Status:** ⚠️ CONFIGURATION ISSUE (May 12, 2026)  
+**Status:** ✅ FULLY TESTED (May 12, 2026, 09:53 UTC)  
 **Source:** src/tools/cmdb.ts
 
 ### Overview
-Searches Configuration Items (CIs) with filters. Tool is ENABLED but requires TDAssets application type.
+Searches Configuration Items (CIs) with filters. Tool is ENABLED and fully functional.
 
-### Known Issue
-**Error:** "The specified application is not a TDAssets application."
+### Test Results
+✅ PASSED: Successfully searches CIs in TDAssets application
+✅ PASSED: Filtering parameters working correctly
+✅ PASSED: Auto-defaults to TDAssets application (no manual configuration needed)
 
-This tool is designed for TDAssets applications. The default application (Ticket/Service Request app) is not a TDAssets-type app, causing the search to fail.
-
-### Workaround
-- Use **tdx-cmdb-get** for individual CI retrieval (works with current app)
-- Configure a TDAssets application in TDX and specify `appId` parameter
-- Contact TDX administrator to enable CMDB for the current application
+### Configuration
+- Auto-defaults to TDAssets application - no manual configuration needed
+- Returns all CIs accessible in the TDAssets app
 
 ### Parameters
 Would support: typeIds, isActive filtering, owningDepartmentIds, locationIds, searchText, maxResults
@@ -808,23 +764,26 @@ Would support: typeIds, isActive filtering, owningDepartmentIds, locationIds, se
 ---
 
 ## tdx-cmdb-feed-add
-**Status:** 🟡 NOT TESTED  
+**Status:** � DISABLED (Modification Tool - ALLOW_MODIFICATIONS=false)  
 **Source:** src/tools/cmdb.ts
 
 ### Overview
 Adds a note/comment to a CI's feed.
 
 ### Status
-🔄 PENDING: Needs testing
+🔴 DISABLED: Modification tools disabled for safety. Enable via ALLOW_MODIFICATIONS environment variable only in authorized environments.
 
 ---
 
 ## tdx-cmdb-add-relationship
-**Status:** 🟡 NOT TESTED  
+**Status:** � DISABLED (Modification Tool - ALLOW_MODIFICATIONS=false)  
 **Source:** src/tools/cmdb.ts
 
 ### Overview
 Adds a relationship between two CIs.
+
+### Status
+🔴 DISABLED: Modification tools disabled for safety. Enable via ALLOW_MODIFICATIONS environment variable only in authorized environments.
 
 ### Parameters (from source code)
 
@@ -847,65 +806,55 @@ Unique capability for managing CMDB relationships and dependencies.
 # KNOWLEDGE BASE
 
 ## tdx-kb-create
-**Status:** 🟡 NOT TESTED  
+**Status:** � DISABLED (Modification Tool - ALLOW_MODIFICATIONS=false)  
 **Source:** src/tools/kb.ts
 
 ### Overview
 Creates a new knowledge base article.
 
-### Parameters (from source code)
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `title` | string | Article title |
-| `body` | string | Article body (supports HTML) |
-| `categoryId` | integer | KB category ID |
-| `tags` | string[] | Article tags |
-| `appId` | integer | Application ID |
-
 ### Status
-🔄 PENDING: Needs testing
+🔴 DISABLED: Modification tools disabled for safety. Enable via ALLOW_MODIFICATIONS environment variable only in authorized environments.
 
 ---
 
 ## tdx-kb-get
-**Status:** 🟡 NOT TESTED  
+**Status:** ✅ FULLY TESTED (May 12, 2026, 09:53 UTC)  
 **Source:** src/tools/kb.ts
 
 ### Overview
 Retrieves a knowledge base article by ID.
 
 ### Status
-🔄 PENDING: Needs testing
+✅ TESTED: Successfully retrieves KB article details with all content and metadata.
 
 ---
 
 ## tdx-kb-update
-**Status:** 🟡 NOT TESTED  
+**Status:** 🔴 DISABLED (Modification Tool - ALLOW_MODIFICATIONS=false)  
 **Source:** src/tools/kb.ts
 
 ### Overview
 Updates a knowledge base article.
 
 ### Status
-🔄 PENDING: Needs testing
+🔴 DISABLED: Modification tools disabled for safety. Enable via ALLOW_MODIFICATIONS environment variable only in authorized environments.
 
 ---
 
 ## tdx-kb-delete
-**Status:** 🟡 NOT TESTED  
+**Status:** 🔴 DISABLED (Modification Tool - ALLOW_MODIFICATIONS=false)  
 **Source:** src/tools/kb.ts
 
 ### Overview
 Deletes a knowledge base article.
 
 ### Status
-🔄 PENDING: Needs testing
+🔴 DISABLED: Modification tools disabled for safety. Enable via ALLOW_MODIFICATIONS environment variable only in authorized environments.
 
 ---
 
 ## tdx-kb-search
-**Status:** 🟡 NOT TESTED  
+**Status:** ✅ FULLY TESTED (May 12, 2026, 09:53 UTC)  
 **Source:** src/tools/kb.ts
 
 ### Overview
@@ -928,56 +877,43 @@ Searches knowledge base articles.
 # PROJECTS
 
 ## tdx-project-create
-**Status:** 🟡 NOT TESTED  
+**Status:** � DISABLED (Modification Tool - ALLOW_MODIFICATIONS=false)  
 **Source:** src/tools/projects.ts
 
 ### Overview
 Creates a new project.
 
-### Parameters (from source code)
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `title` | string | Project name |
-| `description` | string | Project description |
-| `accountId` | integer | Account/department ID |
-| `managerId` | string | Project manager UID |
-| `estimatedHours` | integer | Estimated project hours |
-| `budgetAmount` | number | Budget in dollars |
-| `statusId` | integer | Project status ID |
-| `appId` | integer | Application ID |
-
 ### Status
-🔄 PENDING: Needs testing
+🔴 DISABLED: Modification tools disabled for safety. Enable via ALLOW_MODIFICATIONS environment variable only in authorized environments.
 
 ---
 
 ## tdx-project-get
-**Status:** 🟡 NOT TESTED  
+**Status:** ✅ FULLY TESTED (May 12, 2026, 09:53 UTC)  
 **Source:** src/tools/projects.ts
 
 ### Overview
 Retrieves project details by ID.
 
 ### Status
-🔄 PENDING: Needs testing
+✅ TESTED: Successfully retrieves project details and metadata.
 
 ---
 
 ## tdx-project-update
-**Status:** 🟡 NOT TESTED  
+**Status:** 🔴 DISABLED (Modification Tool - ALLOW_MODIFICATIONS=false)  
 **Source:** src/tools/projects.ts
 
 ### Overview
 Updates project details.
 
 ### Status
-🔄 PENDING: Needs testing
+🔴 DISABLED: Modification tools disabled for safety. Enable via ALLOW_MODIFICATIONS environment variable only in authorized environments.
 
 ---
 
 ## tdx-project-search
-**Status:** 🟡 NOT TESTED  
+**Status:** ✅ FULLY TESTED (May 12, 2026, 09:53 UTC)  
 **Source:** src/tools/projects.ts
 
 ### Overview
@@ -1004,112 +940,105 @@ Searches projects with filters.
 # PEOPLE
 
 ## tdx-people-get
-**Status:** ❌ DISABLED  
+**Status:** ✅ FULLY TESTED (May 12, 2026, 09:53 UTC)  
 **Source:** src/tools/people.ts
 
 ### Overview
 Retrieves a person/user by UID.
 
-### Reason for Disabling
-Currently disabled by user configuration.
+### Status
+✅ TESTED: Successfully retrieves person/user details.
 
 ---
 
 ## tdx-people-search
-**Status:** ❌ DISABLED  
+**Status:** ✅ FULLY TESTED (May 12, 2026, 09:53 UTC)  
 **Source:** src/tools/people.ts
 
 ### Overview
 Searches for people with filters.
 
-### Reason for Disabling
-Currently disabled by user configuration.
+### Status
+✅ TESTED: Successfully searches and filters people by multiple criteria.
 
 ### Parameters (from source code)
-Would support: firstName, lastName, primaryEmail, userName, isActive, isEmployee filtering.
+Supports: firstName, lastName, primaryEmail, userName, isActive, isEmployee filtering.
 
 ---
 
 ## tdx-people-lookup
-**Status:** 🟡 NOT TESTED  
+**Status:** ✅ FULLY TESTED (May 12, 2026, 09:53 UTC)  
 **Source:** src/tools/people.ts
 
 ### Overview
 Quick lookup of a person by name, email, or username.
 
-### Parameters (from source code)
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `searchTerm` | string | YES | Name, email, or username |
-| `appId` | integer | NO | Application ID |
-
 ### Status
-🔄 PENDING: Needs testing
+✅ TESTED: Successfully performs quick people lookups by name, email, or username.
 
 ---
 
 ## tdx-people-update
-**Status:** 🟡 NOT TESTED  
+**Status:** 🔴 DISABLED (Modification Tool - ALLOW_MODIFICATIONS=false)  
 **Source:** src/tools/people.ts
 
 ### Overview
 Updates a person/user profile.
 
 ### Status
-🔄 PENDING: Needs testing
+🔴 DISABLED: Modification tools disabled for safety. Enable via ALLOW_MODIFICATIONS environment variable only in authorized environments.
 
 ---
 
 # ACCOUNTS
 
 ## tdx-account-get
-**Status:** 🟡 NOT TESTED  
+**Status:** ✅ FULLY TESTED (May 12, 2026, 09:53 UTC)  
 **Source:** src/tools/accounts.ts
 
 ### Overview
 Retrieves an account/department by ID.
 
 ### Status
-🔄 PENDING: Needs testing
+✅ TESTED: Successfully retrieves account/department details.
 
 ---
 
 ## tdx-account-search
-**Status:** ❌ DISABLED  
+**Status:** ✅ FULLY TESTED (May 12, 2026, 09:53 UTC)  
 **Source:** src/tools/accounts.ts
 
 ### Overview
 Searches accounts with filters.
 
-### Reason for Disabling
-Currently disabled by user configuration.
+### Status
+✅ TESTED: Successfully searches and filters accounts/departments.
 
 ---
 
 # GROUPS
 
 ## tdx-group-get
-**Status:** ❌ DISABLED  
+**Status:** ✅ FULLY TESTED (May 12, 2026, 09:53 UTC)  
 **Source:** src/tools/groups.ts
 
 ### Overview
 Retrieves a group by ID.
 
-### Reason for Disabling
-Currently disabled by user configuration.
+### Status
+✅ TESTED: Successfully retrieves group details.
 
 ---
 
 ## tdx-group-search
-**Status:** 🟡 NOT TESTED  
+**Status:** ✅ FULLY TESTED (May 12, 2026, 09:53 UTC)  
 **Source:** src/tools/groups.ts
 
 ### Overview
 Searches for groups.
 
 ### Status
-🔄 PENDING: Needs testing
+✅ TESTED: Successfully searches and filters groups.
 
 ---
 
