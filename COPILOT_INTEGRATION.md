@@ -1,16 +1,20 @@
 # TDX MCP HTTP Server - Example Copilot Studio Integration
 
+## ⚠️ Example Notice
+This is an **example configuration** showing how to integrate with Copilot Studio. It contains placeholder values `[YOUR_*]` that should be replaced with your actual Azure and TDX configuration values when you're ready to deploy.
+
 ## Status
-✅ **Server is deployed and ready for Copilot Studio integration**
-🔐 **Entra/Azure Authentication: ACTIVE** (All endpoints except `/health` require authentication)
-📊 **Available Tools**: 43 tools across 10 domains
+✅ **Server ready for Copilot Studio integration**
+🔐 **Entra/Azure Authentication: Configurable** (All endpoints except `/health` require authentication)
+📊 **Available Tools**: 43 tools across 10 domains (17 read-only by default, 26 modification tools optional)
 
 ## Service Details
-- **Status**: Active (deployed)
-- **Deployment Platform**: Azure [specify: App Service/AKS/Container Instances/other]
+- **Version**: 1.0.0
+- **Deployment Platform**: Azure (App Service/AKS/Container Instances)
 - **Private URL**: https://[YOUR_PRIVATE_URL]
 - **Authentication**: Entra/Azure OAuth 2.0
-- **Service**: Managed cloud service
+- **Service Type**: Managed cloud service or self-hosted
+- **Testing**: Comprehensive test suite available in `/tests/` directory
 
 ## HTTP Endpoints
 
@@ -134,9 +138,12 @@ Authorization: Bearer {ACCESS_TOKEN}
 ## Entra/Azure Authentication
 
 ### OAuth 2.0 Configuration
-✅ **OAuth 2.0 / OIDC is ACTIVE and deployed**
+The MCP service can be secured with Entra/Azure authentication using OAuth 2.0 / OpenID Connect (OIDC).
 
-The MCP service is now secured with Entra/Azure authentication using OAuth 2.0 / OpenID Connect (OIDC).
+**To enable authentication:**
+1. Create an Azure Entra app registration (see [Azure App Registration Details](#azure-app-registration-details) section)
+2. Configure the environment variables with your app credentials
+3. All protected endpoints will automatically require valid access tokens
 
 **Protected Endpoints** (require valid Azure AD access token):
 - `GET /status`
@@ -476,6 +483,8 @@ requests
 
 ## Environment Variables & Configuration
 
+⚠️ **All placeholder values below must be replaced with your actual configuration before deployment.**
+
 Available environment variables (typically configured in Azure App Settings):
 
 **Deployment Configuration:**
@@ -513,33 +522,64 @@ Available environment variables (typically configured in Azure App Settings):
 
 ## Deployment Checklist
 
-Before going live with Copilot Studio integration:
+Complete these steps in order before going live with Copilot Studio integration:
 
-1. ✅ **Azure App Service Deployed** - Service running on private URL
-2. ✅ **Entra/Azure Authentication Configured** - OAuth 2.0 app registration complete
-3. ✅ **Private URL Secured** - HTTPS enforced with Azure-managed certificate
-4. ✅ **Application Secrets Stored** - Client ID, Secret, Tenant ID in Azure Key Vault
-5. **Configure Copilot Studio** - Create OAuth connection and actions (see Copilot Studio Configuration section)
-6. **Test Connectivity** - Verify Copilot can authenticate and call the MCP service
-7. **Test Tool Invocations** - End-to-end testing of each action
-8. **Monitor & Alert** - Enable Application Insights and configure alerts
-9. **Document & Train** - Update agent prompt documentation with available tools
-10. **Go Live** - Publish actions to Copilot agents
+1. **Local Testing** - Run `tests/test-comprehensive.ps1` and verify all tests pass
+2. **Azure App Service Deployed** - Service running on private URL with HTTPS
+3. **Environment Variables Configured** - Set all TDX and Azure credentials in App Settings
+4. **Entra/Azure Authentication Configured** - OAuth 2.0 app registration complete with credentials
+5. **Private URL Secured** - HTTPS enforced with Azure-managed certificate
+6. **Application Secrets Stored** - Client ID, Secret, Tenant ID securely in Azure Key Vault
+7. **Configure Copilot Studio** - Create OAuth connection and actions (see Copilot Studio Configuration section)
+8. **Test Connectivity** - Verify Copilot can authenticate and call the MCP service
+9. **Test Tool Invocations** - End-to-end testing of each action (especially CMDB with appId=116)
+10. **Monitor & Alert** - Enable Application Insights and config
+11. **Documentation** - Update agent prompt documentation with available tools
+12. **Go Live** - Publish actions to Copilot agents
+
+## Testing Your Integration
+
+Before deploying to Copilot Studio, test the MCP service locally:
+
+### Run Comprehensive Test Suite
+```powershell
+cd tests/
+.\test-comprehensive.ps1
+```
+
+The test suite (`test-comprehensive.ps1`) validates:
+- ✅ All 43 tools are properly registered
+- ✅ Read-only tools work correctly
+- ✅ Modification tools (if enabled) execute successfully
+- ✅ Error handling and edge cases
+- ✅ CMDB operations with required appId parameter
+- ✅ Response format compliance
+
+**Test Results**: Results are saved to `tests/results/` directory with timestamp.
+
+### Key Testing Notes
+- **Test Parameters**: Edit `test-params.ps1` to configure your TDX credentials
+- **Expected Output**: Tests produce JSON results with pass/fail summary
+
+See `tests/README.md` for detailed testing documentation.
 
 ## Next Steps
 
-1. **Azure Deployment** - Deploy application to Azure using preferred method (App Service, AKS, Containers)
-2. **Azure Entra Setup** - Create app registration and obtain credentials
-3. **Configure App Settings** - Set all required environment variables in Azure
-4. **Configure Copilot Studio** - Create OAuth connection with Azure credentials
-5. **Create Agent Actions** - Add actions for each TDX tool you need
-6. **Test Integration** - Verify end-to-end connectivity and token flow
-7. **Enable Monitoring** - Set up Application Insights alerts and dashboards
+1. **Local Testing** - Run `test-comprehensive.ps1` to validate your setup
+2. **Azure Deployment** - Deploy application to Azure using preferred method (App Service, AKS, Containers)
+3. **Azure Entra Setup** - Create app registration and obtain credentials
+4. **Configure App Settings** - Set all required environment variables in Azure
+5. **Configure Copilot Studio** - Create OAuth connection with Azure credentials
+6. **Create Agent Actions** - Add actions for each TDX tool you need
+7. **Test Integration** - Verify end-to-end connectivity and token flow
+8. **Enable Monitoring** - Set up Application Insights alerts and dashboards
 
 ## Support & Documentation
 
 For issues, check:
+- **Testing Issues**: See `tests/README.md` for troubleshooting
+- **Azure Deployment**: Check `DEPLOYMENT_UBUNTU.md` for server setup
 - **Azure Portal**: App Service logs and Application Insights
 - **Copilot Studio**: Check connection status and action definitions
 - **Entra/Azure AD**: Verify app registration and API permissions
-- **Documentation**: Reference API_RESPONSE_SCHEMA.md and README.md
+- **Documentation**: Reference [README.md](README.md) for architecture and tools overview
