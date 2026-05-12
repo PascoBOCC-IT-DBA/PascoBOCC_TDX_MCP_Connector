@@ -28,5 +28,5 @@ COPILOT_INTEGRATION.md
 tdx-mcp.service
 
 # Test & Query Scripts
-/scripts
-/tests
+/tests/results
+/tests/test-params.ps1
