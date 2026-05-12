@@ -3,19 +3,18 @@ import { z } from "zod";
 import { TdxClient } from "../tdx-client.js";
 
 export function registerCmdbReadOnlyTools(server: McpServer, client: TdxClient) {
-  const defaultAppId = client.appId;
+  // CMDB always uses TDAssets application
+  const appId = client.assetsAppId;
 
   server.tool(
     "tdx-cmdb-get",
     "Get a TDX configuration item by ID",
     {
-      appId: z.number().optional().describe("TDX app ID (defaults to env TDX_APP_ID)"),
       id: z.number().describe("CI ID"),
     },
     async (params) => {
-      const app = params.appId ?? defaultAppId;
       try {
-        const result = await client.get(`/${app}/cmdb/${params.id}`);
+        const result = await client.get(`/${appId}/cmdb/${params.id}`);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
         return { content: [{ type: "text", text: String(e) }], isError: true };
@@ -27,7 +26,6 @@ export function registerCmdbReadOnlyTools(server: McpServer, client: TdxClient) 
     "tdx-cmdb-search",
     "Search TDX configuration items with filters",
     {
-      appId: z.number().optional().describe("TDX app ID (defaults to env TDX_APP_ID)"),
       searchText: z.string().optional().describe("Full-text search query"),
       typeIds: z.array(z.number()).optional().describe("Filter by CI type IDs"),
       isActive: z.boolean().optional().describe("Filter by active status"),
@@ -36,7 +34,6 @@ export function registerCmdbReadOnlyTools(server: McpServer, client: TdxClient) 
       maxResults: z.number().optional().describe("Max results to return (default 25)"),
     },
     async (params) => {
-      const app = params.appId ?? defaultAppId;
       const body: Record<string, unknown> = {};
       if (params.searchText !== undefined) body.SearchText = params.searchText;
       if (params.typeIds !== undefined) body.TypeIDs = params.typeIds;
@@ -45,7 +42,7 @@ export function registerCmdbReadOnlyTools(server: McpServer, client: TdxClient) 
       if (params.locationIds !== undefined) body.LocationIDs = params.locationIds;
       if (params.maxResults !== undefined) body.MaxResults = params.maxResults;
       try {
-        const result = await client.post(`/${app}/cmdb/search`, body);
+        const result = await client.post(`/${appId}/cmdb/search`, body);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
         return { content: [{ type: "text", text: String(e) }], isError: true };
@@ -55,13 +52,13 @@ export function registerCmdbReadOnlyTools(server: McpServer, client: TdxClient) 
 }
 
 export function registerCmdbTools(server: McpServer, client: TdxClient) {
-  const defaultAppId = client.appId;
+  // CMDB always uses TDAssets application
+  const appId = client.assetsAppId;
 
   server.tool(
     "tdx-cmdb-create",
     "Create a new TDX configuration item (CI)",
     {
-      appId: z.number().optional().describe("TDX app ID (defaults to env TDX_APP_ID)"),
       typeId: z.number().describe("CI type ID"),
       name: z.string().describe("CI name"),
       formId: z.number().optional().describe("Form ID"),
@@ -78,7 +75,6 @@ export function registerCmdbTools(server: McpServer, client: TdxClient) {
       })).optional().describe("Custom attributes"),
     },
     async (params) => {
-      const app = params.appId ?? defaultAppId;
       const body: Record<string, unknown> = {
         TypeID: params.typeId,
         Name: params.name,
@@ -95,7 +91,7 @@ export function registerCmdbTools(server: McpServer, client: TdxClient) {
         body.Attributes = params.attributes.map((a) => ({ ID: a.id, Value: String(a.value) }));
       }
       try {
-        const result = await client.post(`/${app}/cmdb`, body);
+        const result = await client.post(`/${appId}/cmdb`, body);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
         return { content: [{ type: "text", text: String(e) }], isError: true };
@@ -107,14 +103,12 @@ export function registerCmdbTools(server: McpServer, client: TdxClient) {
     "tdx-cmdb-update",
     "Full update of a TDX configuration item",
     {
-      appId: z.number().optional().describe("TDX app ID (defaults to env TDX_APP_ID)"),
       id: z.number().describe("CI ID"),
       data: z.record(z.unknown()).describe("Full CI data (PascalCase TDX field names)"),
     },
     async (params) => {
-      const app = params.appId ?? defaultAppId;
       try {
-        const result = await client.put(`/${app}/cmdb/${params.id}`, params.data);
+        const result = await client.put(`/${appId}/cmdb/${params.id}`, params.data);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
         return { content: [{ type: "text", text: String(e) }], isError: true };
@@ -126,13 +120,11 @@ export function registerCmdbTools(server: McpServer, client: TdxClient) {
     "tdx-cmdb-delete",
     "Delete a TDX configuration item",
     {
-      appId: z.number().optional().describe("TDX app ID (defaults to env TDX_APP_ID)"),
       id: z.number().describe("CI ID"),
     },
     async (params) => {
-      const app = params.appId ?? defaultAppId;
       try {
-        await client.delete(`/${app}/cmdb/${params.id}`);
+        await client.delete(`/${appId}/cmdb/${params.id}`);
         return { content: [{ type: "text", text: "CI deleted successfully" }] };
       } catch (e: unknown) {
         return { content: [{ type: "text", text: String(e) }], isError: true };
@@ -144,21 +136,19 @@ export function registerCmdbTools(server: McpServer, client: TdxClient) {
     "tdx-cmdb-feed-add",
     "Add a comment/feed entry to a TDX configuration item",
     {
-      appId: z.number().optional().describe("TDX app ID (defaults to env TDX_APP_ID)"),
       id: z.number().describe("CI ID"),
       comments: z.string().describe("Comment text (HTML supported)"),
       isPrivate: z.boolean().optional().describe("Whether the comment is private (default false)"),
       notify: z.array(z.string()).optional().describe("UIDs to notify"),
     },
     async (params) => {
-      const app = params.appId ?? defaultAppId;
       const body: Record<string, unknown> = {
         Comments: params.comments,
       };
       if (params.isPrivate !== undefined) body.IsPrivate = params.isPrivate;
       if (params.notify !== undefined) body.Notify = params.notify;
       try {
-        const result = await client.post(`/${app}/cmdb/${params.id}/feed`, body);
+        const result = await client.post(`/${appId}/cmdb/${params.id}/feed`, body);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
         return { content: [{ type: "text", text: String(e) }], isError: true };
@@ -170,21 +160,19 @@ export function registerCmdbTools(server: McpServer, client: TdxClient) {
     "tdx-cmdb-add-relationship",
     "Add a relationship between two TDX configuration items",
     {
-      appId: z.number().optional().describe("TDX app ID (defaults to env TDX_APP_ID)"),
       id: z.number().describe("Source CI ID"),
       otherItemId: z.number().describe("Target CI ID"),
       typeId: z.number().describe("Relationship type ID"),
       isInverse: z.boolean().optional().describe("Whether this is an inverse relationship"),
     },
     async (params) => {
-      const app = params.appId ?? defaultAppId;
       const body: Record<string, unknown> = {
         OtherItemID: params.otherItemId,
         TypeID: params.typeId,
       };
       if (params.isInverse !== undefined) body.IsInverse = params.isInverse;
       try {
-        const result = await client.put(`/${app}/cmdb/${params.id}/relationships`, body);
+        const result = await client.put(`/${appId}/cmdb/${params.id}/relationships`, body);
         return { content: [{ type: "text", text: JSON.stringify(result ?? "Relationship added successfully", null, 2) }] };
       } catch (e: unknown) {
         return { content: [{ type: "text", text: String(e) }], isError: true };
