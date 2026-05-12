@@ -52,7 +52,7 @@ chown -R "$SERVICE_USER:$SERVICE_USER" "$PROJECT_DIR"
 
 # Step 4: Clone or copy project
 echo -e "${YELLOW}Step 4: Project files location: $PROJECT_DIR${NC}"
-echo -e "${YELLOW}        (Copy your project files here before proceeding)${NC}"
+echo -e "${YELLOW}        (Copy your entire project directory here: source files, package.json, tsconfig.json)${NC}"
 
 # Step 5: Install dependencies
 echo -e "${YELLOW}Step 5: Installing project dependencies...${NC}"
@@ -92,7 +92,8 @@ WorkingDirectory=$PROJECT_DIR
 Environment="NODE_ENV=production"
 Environment="MCP_HTTP_PORT=3000"
 Environment="MCP_API_KEY=$API_KEY"
-ExecStart=/usr/bin/node $PROJECT_DIR/src/http-wrapper.js
+Environment="ALLOW_MODIFICATIONS=false"
+ExecStart=/usr/bin/node $PROJECT_DIR/dist/http-wrapper.js
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal
