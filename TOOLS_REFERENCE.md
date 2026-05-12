@@ -40,7 +40,40 @@ Searches and filters TeamDynamix tickets. All filters combine with AND logic.
 - `maxResults` (integer, optional) - Max results to return (default: 25)
 - `appId` (integer, optional) - Application ID (defaults to TDX_APP_ID)
 
-**Returns:** Array of ticket objects with ID, Title, CreatedDate, StatusID, StatusName, PriorityID, PriorityName, AccountID, AccountName, RequestorID, RequestorFullName, Description, and 40+ additional fields.
+**Returns:** Array of ticket objects. Example ticket:
+```json
+{
+  "ID": 4709555,
+  "Title": "Fire Station 2 Shared Account Creations",
+  "AccountID": 3870,
+  "AccountName": "Fire Suppression",
+  "StatusID": 898,
+  "StatusName": "Closed",
+  "StatusClass": 3,
+  "TypeID": 866,
+  "TypeName": "Accounts & Access",
+  "Classification": 46,
+  "ClassificationName": "Service Request",
+  "PriorityID": 329,
+  "PriorityName": "P3",
+  "PriorityOrder": 3,
+  "CreatedDate": "2026-05-01T19:55:46.927Z",
+  "CreatedFullName": "Joshua Taylor",
+  "CreatedEmail": "",
+  "ModifiedDate": "2026-05-01T20:00:43.693Z",
+  "ModifiedFullName": "Patrick Macaraeg",
+  "RequestorName": "Joshua Taylor",
+  "RequestorEmail": "jtaylor@pascocountyfl.net",
+  "RequestorPhone": "727-353-2967",
+  "ResponsibleGroupID": 388,
+  "ResponsibleGroupName": "INOSC",
+  "CompletedDate": "2026-05-01T20:00:43.693Z",
+  "ServiceID": 1967,
+  "ServiceName": "Account Update / Name Change",
+  "ServiceCategoryName": "Accounts & Access",
+  "webLink": "https://service.pascocountyfl.net/TDNext/Apps/115/Tickets/TicketDet?TicketID=4709555"
+}
+```
 
 **Notes:** Search text does not support filter syntax; case-insensitive. Empty results return empty array without error.
 
@@ -56,7 +89,7 @@ Retrieves full details for a specific ticket by ID.
 - `id` (integer, required) - Ticket ID
 - `appId` (integer, optional) - Application ID (defaults to TDX_APP_ID)
 
-**Returns:** Complete ticket object with 55+ fields including nested data for requestor, responsible party, and account.
+**Returns:** Complete single ticket object. Example structure (same as tdx-ticket-search result format, typically 55+ fields).
 
 ---
 
@@ -70,9 +103,28 @@ Retrieves the activity feed/comment history for a specific ticket.
 - `id` (integer, required) - Ticket ID
 - `appId` (integer, optional) - Application ID (defaults to TDX_APP_ID)
 
-**Returns:** Array of feed entries with ID, CreatedDate, CreatedBy, UpdateType, Body, IsEdited flag.
+**Returns:** Array of feed entry objects. Example feed entry:
+```json
+{
+  "ID": 51547063,
+  "CreatedFullName": "System",
+  "CreatedDate": "2026-05-12T17:35:54.547Z",
+  "ItemType": 25,
+  "ItemID": 802693,
+  "ItemTitle": "FY27 Public Services - PRNR - Fiscal & Support Services Neat Order",
+  "Body": "Added this ticket task to workspace \"IT Management\" via rule \"Open Task for IT Management\" owned by \"Steven Basak\".",
+  "IsRichHtml": false,
+  "UpdateType": 3,
+  "IsPrivate": true,
+  "RepliesCount": 0,
+  "LikesCount": 0,
+  "IsCommunication": false,
+  "HasAttachment": false,
+  "Uri": "api/feed/51547063"
+}
+```
 
-**Notes:** Provides complete audit trail and ticket lifecycle tracking.
+**Notes:** Provides complete audit trail and ticket lifecycle tracking with all updates and comments in chronological order. UpdateType indicates the nature of the feed entry.
 
 ---
 
@@ -192,7 +244,7 @@ Retrieves full details for a specific asset by ID.
 - `id` (integer, required) - Asset ID
 - `appId` (integer, optional) - Application ID (defaults to TDX_ASSETS_APP_ID or TDX_APP_ID)
 
-**Returns:** Complete asset object with ID, Name, FormID, FormName, StatusID, StatusName, SerialNumber, ModelID, ModelName, ManufacturerID, ManufacturerName, LocationID, LocationName, OwningDepartmentID, OwningDepartmentName, PurchaseCost, AcquisitionDate, ExpectedReplacementDate, CreatedDate, ModifiedDate, CustomAttributes, and additional fields.
+**Returns:** Complete single asset object (includes custom attributes and attachments). Example structure matches tdx-asset-search result format.
 
 ---
 
@@ -213,7 +265,39 @@ Searches and filters assets with multiple filter options. All filters combine wi
 - `maxResults` (integer, optional) - Max results to return (default: 25)
 - `appId` (integer, optional) - Application ID (defaults to TDX_ASSETS_APP_ID or TDX_APP_ID)
 
-**Returns:** Array of asset objects with complete details matching search criteria.
+**Returns:** Array of asset objects. Example asset:
+```json
+{
+  "ID": 33103,
+  "AppID": 116,
+  "AppName": "Assets/CIs",
+  "FormID": 1773,
+  "FormName": "Computer Asset Form",
+  "ProductModelID": 2310,
+  "ProductModelName": "S08J00",
+  "ManufacturerID": 1169,
+  "ManufacturerName": "Lenovo",
+  "SupplierID": 969,
+  "SupplierName": "Computers at Work d/b/a vTech io",
+  "StatusID": 1032,
+  "StatusName": "Lottery",
+  "LocationID": 12008,
+  "LocationName": "ISB Annex - Information Technology",
+  "Tag": "PW02RB2P",
+  "SerialNumber": "PW02RB2P",
+  "Name": "BCCIT171L",
+  "PurchaseCost": 0,
+  "AcquisitionDate": "2022-07-21T04:00:00Z",
+  "OwningDepartmentID": 2356,
+  "OwningDepartmentName": "Information Technology",
+  "CreatedDate": "2022-12-22T17:58:23.087Z",
+  "CreatedFullName": "Samantha Grahn",
+  "ModifiedDate": "2025-12-02T17:16:21.267Z",
+  "ModifiedFullName": "Rosalyn Padilla",
+  "ConfigurationItemID": 38407,
+  "Uri": "api/116/assets/33103"
+}
+```
 
 ---
 
@@ -333,10 +417,11 @@ Retrieves full details for a specific configuration item (CI) by ID.
 
 **Parameters:**
 - `id` (integer, required) - CI ID
+- `appId` (integer, optional) - Application ID (always 116 for TDAssets; parameter for consistency)
 
-**Returns:** Complete CI object with ID, Name, TypeID, TypeName, FormID, FormName, IsActive, OwningDepartmentID, OwningDepartmentName, LocationID, LocationName, CreatedDate, ModifiedDate, CustomAttributes, and additional fields.
+**Returns:** Complete single CI object with fields: ID, Name, TypeID, TypeName, FormID, FormName, IsActive, Description, OwningDepartmentID, OwningDepartmentName, LocationID, LocationName, ManufacturerID, ManufacturerName, SerialNumber, StatusID, StatusName, CreatedDate, ModifiedDate, CustomAttributes, and additional fields. Structure mirrors asset/CI objects from TDAssets application.
 
-**Notes:** CMDB always uses the TDAssets application.
+**Notes:** CMDB always uses the TDAssets application (appId 116).
 
 ---
 
@@ -353,10 +438,35 @@ Searches and filters configuration items with multiple filter options. All filte
 - `owningDepartmentIds` (integer[], optional) - Filter by owning department IDs
 - `locationIds` (integer[], optional) - Filter by location IDs
 - `maxResults` (integer, optional) - Max results to return (default: 25)
+- `appId` (integer, optional) - Application ID (defaults to 116 for TDAssets)
 
-**Returns:** Array of CI objects matching search criteria.
+**Returns:** Array of CI objects. Example CI structure:
+```json
+{
+  "ID": 39309,
+  "AppID": 116,
+  "AppName": "Assets/CIs",
+  "Name": "PCCKIT04W",
+  "TypeID": 1,
+  "TypeName": "Asset",
+  "FormID": 1773,
+  "FormName": "Computer Asset Form",
+  "IsSystemMaintained": true,
+  "BackingItemID": 33982,
+  "OwningDepartmentID": 2339,
+  "OwningDepartmentName": "Corrections",
+  "LocationID": 13457,
+  "LocationName": "PCDC - Kitchen",
+  "IsActive": true,
+  "CreatedDateUtc": "2022-12-27T03:20:33.5333333Z",
+  "CreatedFullName": "Samantha Grahn",
+  "ModifiedDateUtc": "2026-05-12T17:13:10.3766667Z",
+  "ModifiedFullName": "David Cecere",
+  "Uri": "api/116/cmdb/39309"
+}
+```
 
-**Notes:** CMDB always uses the TDAssets application (no appId parameter needed).
+**Notes:** CMDB always uses the TDAssets application (appId 116). Large result sets may timeout; use specific filters to narrow results.
 
 ---
 
@@ -454,7 +564,7 @@ Retrieves a knowledge base article by ID.
 - `id` (integer, required) - KB article ID
 - `appId` (integer, optional) - Application ID (defaults to TDX_KB_APP_ID or TDX_APP_ID)
 
-**Returns:** Complete KB article object with ID, Subject, Body, Summary, Status, CategoryID, CreatedDate, ModifiedDate, OwnerUID, Tags, CustomAttributes, and additional fields.
+**Returns:** Complete single KB article object. Example structure (same as tdx-kb-search result format with all article fields including full HTML body).
 
 ---
 
@@ -472,7 +582,32 @@ Searches knowledge base articles with multiple filter options. All filters combi
 - `maxResults` (integer, optional) - Max results to return (default: 25)
 - `appId` (integer, optional) - Application ID (defaults to TDX_KB_APP_ID or TDX_APP_ID)
 
-**Returns:** Array of KB article objects matching search criteria.
+**Returns:** Array of KB article objects. Example structure of a single article:
+```json
+{
+  "ID": 6153,
+  "AppID": 114,
+  "AppName": "Client Portal",
+  "CategoryID": 711,
+  "CategoryName": "Accounts & Access",
+  "Subject": "How to Reset Your Password in Pasco365",
+  "Body": "<div class=\"gutter-top break-word...\">HTML content...</div>",
+  "Summary": "This document will help those who need to reset their County password...",
+  "Status": 3,
+  "StatusName": "Approved",
+  "Order": 1,
+  "IsPublished": true,
+  "IsPublic": true,
+  "CreatedDate": "2023-07-10T20:21:23.79Z",
+  "CreatedFullName": "Alexis Garton",
+  "ModifiedDate": "2023-07-11T12:46:30.067Z",
+  "ModifiedFullName": "Alexis Garton",
+  "OwningGroupID": 370,
+  "OwningGroupName": "Desktop Support",
+  "Tags": null,
+  "RevisionNumber": 2
+}
+```
 
 ---
 
@@ -540,7 +675,7 @@ Retrieves project details by ID.
 **Parameters:**
 - `id` (integer, required) - Project ID
 
-**Returns:** Complete project object with ID, Name, Description, StatusID, StatusName, PriorityID, PriorityName, AccountID, AccountName, ManagerUID, ManagerName, StartDate, EndDate, BudgetedHours, EstimatedHours, CreatedDate, ModifiedDate, CustomAttributes, and additional fields.
+**Returns:** Complete single project object. Example structure (same as tdx-project-search result format).
 
 ---
 
@@ -559,7 +694,33 @@ Searches projects with multiple filter options. All filters combine with AND log
 - `isActive` (boolean, optional) - Filter by active status
 - `maxResults` (integer, optional) - Max results to return (default: 25)
 
-**Returns:** Array of project objects matching search criteria.
+**Returns:** Array of project objects. Example structure of a single project:
+```json
+{
+  "ID": 927,
+  "Name": "Enterprise Credit Card Processing",
+  "AccountID": 2356,
+  "AccountName": "Information Technology",
+  "StatusID": 873,
+  "StatusName": "In Process",
+  "PriorityID": 1127,
+  "PriorityName": "P5",
+  "Description": "",
+  "AdminUID": "763e3bc1-5322-ed11-bd6e-0050f2f4ae01",
+  "AdminName": "Samantha Grahn",
+  "AdminEmail": "sgrahn@pascocountyfl.net",
+  "CreatedDate": "2022-11-29T14:21:11.313Z",
+  "ModifiedDate": "2025-07-21T12:56:12.57Z",
+  "PercentComplete": 100,
+  "IsActive": true,
+  "StartDate": "2021-11-02T00:00:00Z",
+  "EndDate": "2023-03-31T00:00:00Z",
+  "TypeID": 758,
+  "TypeName": "Software Implementation",
+  "EstimatedHours": 0,
+  "BudgetedHours": 0
+}
+```
 
 ---
 
@@ -611,7 +772,7 @@ Retrieves a person/user by UID.
 **Parameters:**
 - `uid` (string, required) - Person UID
 
-**Returns:** Complete person object with UID, FirstName, LastName, PrimaryEmail, UserName, IsActive, IsEmployee, AccountID, AccountName, CreatedDate, ModifiedDate, and additional fields.
+**Returns:** Complete single person object. Example structure (same as tdx-people-search result format).
 
 ---
 
@@ -632,7 +793,31 @@ Searches for people with multiple filter options. All filters combine with AND l
 - `accountIds` (integer[], optional) - Filter by account IDs
 - `maxResults` (integer, optional) - Max results to return (default: 25)
 
-**Returns:** Array of person objects matching search criteria.
+**Returns:** Array of person objects. Example structure of a single person:
+```json
+{
+  "UID": "37b3743f-adf0-f011-93dc-dac58e0fb9ad",
+  "FullName": "a test4",
+  "FirstName": "a",
+  "LastName": "test4",
+  "UserName": "atest4@pascocountyfl.net",
+  "PrimaryEmail": "atest4@pascocountyfl.net",
+  "IsActive": true,
+  "IsEmployee": true,
+  "DefaultAccountID": 2356,
+  "DefaultAccountName": "Information Technology",
+  "Company": "Information Technology",
+  "Title": "",
+  "WorkPhone": "",
+  "MobilePhone": "",
+  "CreatedDate": "2023-07-10T20:21:23.79Z",
+  "TZID": 2,
+  "TZName": "(GMT-05:00)Eastern Time(US and Canada)",
+  "SecurityRoleName": "Client",
+  "ReportsToUID": "37b3743f-adf0-f011-93dc-dac58e0fb9ad",
+  "ReportsToFullName": "a test4"
+}
+```
 
 ---
 
@@ -677,7 +862,7 @@ Retrieves an account/department by ID.
 **Parameters:**
 - `id` (integer, required) - Account/Department ID
 
-**Returns:** Complete account object with ID, Name, Description, IsActive, ParentAccountID, CreatedDate, ModifiedDate, and additional fields.
+**Returns:** Complete single account object. Example structure (same as tdx-account-search result format).
 
 ---
 
@@ -692,7 +877,33 @@ Searches accounts/departments with filter options. All filters combine with AND 
 - `isActive` (boolean, optional) - Filter by active status
 - `maxResults` (integer, optional) - Max results to return (default: 25)
 
-**Returns:** Array of account objects matching search criteria.
+**Returns:** Array of account objects. Example account:
+```json
+{
+  "ID": 2388,
+  "Name": "6th Judicial",
+  "ParentID": 2330,
+  "ParentName": "External",
+  "IsActive": true,
+  "Address1": "",
+  "City": "",
+  "StateName": "",
+  "PostalCode": "",
+  "Country": "",
+  "Phone": "",
+  "Fax": "",
+  "Url": "",
+  "Notes": "",
+  "CreatedDate": "2022-09-15T14:49:00Z",
+  "ModifiedDate": "2022-09-15T14:49:00Z",
+  "Code": "",
+  "IndustryID": 0,
+  "IndustryName": null,
+  "ManagerUID": "00000000-0000-0000-0000-000000000000",
+  "ManagerFullName": null,
+  "Attributes": ""
+}
+```
 
 ---
 
@@ -707,7 +918,7 @@ Retrieves a group by ID.
 **Parameters:**
 - `id` (integer, required) - Group ID
 
-**Returns:** Complete group object with ID, Name, Description, IsActive, CreatedDate, ModifiedDate, and additional fields.
+**Returns:** Complete single group object. Example structure (same as tdx-group-search result format).
 
 ---
 
@@ -723,7 +934,19 @@ Searches for groups with filter options. All filters combine with AND logic.
 - `hasAppId` (integer, optional) - Filter by associated application ID
 - `maxResults` (integer, optional) - Max results to return (default: 25)
 
-**Returns:** Array of group objects matching search criteria.
+**Returns:** Array of group objects. Example group:
+```json
+{
+  "ID": 371,
+  "Name": "Accela Support",
+  "Description": "Accela Support group for ticketing",
+  "IsActive": true,
+  "ExternalID": "",
+  "CreatedDate": "2022-09-13T19:36:01.69Z",
+  "ModifiedDate": "2022-09-15T15:15:02.83Z",
+  "PlatformApplications": ""
+}
+```
 
 ---
 
@@ -739,7 +962,22 @@ Retrieves available statuses for a specific TDX component type.
 - `componentType` (enum, required) - Component type to get statuses for: "tickets", "assets", "projects", "cmdb", or "knowledgebase"
 - `appId` (integer, optional) - Application ID (not applicable for knowledgebase)
 
-**Returns:** Array of status objects with ID, Name, Order, StatusClass, IsActive, RequireGoesOffHold, DoNotReopen, and additional fields.
+**Returns:** Array of status objects. Example status:
+```json
+{
+  "ID": 894,
+  "AppID": 115,
+  "AppName": "IT Tickets",
+  "Name": "New",
+  "Description": "",
+  "Order": 1,
+  "StatusClass": 1,
+  "IsActive": true,
+  "RequireGoesOffHold": false,
+  "DoNotReopen": false,
+  "IsDefault": true
+}
+```
 
 **Notes:** Use this tool to discover valid `statusIds` for filtering and creating items. Status IDs are required for many search and creation operations.
 
@@ -758,9 +996,27 @@ Retrieves custom attribute definitions for a TDX component type.
 - `appId` (integer, optional) - Application ID (defaults to TDX_APP_ID)
 - `associatedTypeId` (integer, optional) - Filter by associated type ID
 
-**Returns:** Comprehensive custom attribute schema including attribute IDs, names, types (text, number, dropdown, date, etc.), valid choices for dropdowns, required/optional status, display order, and custom validation rules.
+**Returns:** Array of custom attribute definition objects. Example attribute:
+```json
+{
+  "ID": 4424,
+  "Name": "800 Number you tried to call",
+  "Order": 0,
+  "Description": "",
+  "SectionID": 0,
+  "FieldType": "textbox",
+  "DataType": "String",
+  "Choices": [],
+  "IsRequired": false,
+  "IsUpdatable": false,
+  "Value": "",
+  "ValueText": "",
+  "ChoicesText": "",
+  "AssociatedItemIDs": [0]
+}
+```
 
-**Notes:** Essential for understanding the custom field structure before creating/updating items. Returns large JSON objects with complete field metadata.
+**Notes:** Returns comprehensive attribute schema with field types (textbox, textarea, dropdown, datefield, etc.), required/optional status, display order, and choice options for dropdowns. Essential for understanding custom field structure before creating/updating items.
 
 ---
 
@@ -802,558 +1058,3 @@ Retrieves custom attribute definitions for a TDX component type.
 - **Dates:** ISO 8601 format (e.g., "2026-05-11T14:47:31.68Z")
 - **Status/Priority/Type IDs:** Use `tdx-statuses-get` to discover valid values
 
----
-
-## tdx-cmdb-get
-**Status:** ✅ FULLY TESTED (May 12, 2026, 09:53 UTC)  
-**Source:** src/tools/cmdb.ts
-
-### Overview
-Retrieves details for a specific CI by ID from the TDAssets application.
-
-### Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `id` | integer | YES | CI ID |
-| `appId` | integer | NO | Application ID (auto-defaults to TDAssets) |
-
-### Test Results
-✅ PASSED: Successfully retrieved CI data with all attributes
-✅ PASSED: Error handling verified for invalid CI IDs
-✅ Auto-defaults to TDAssets application (no manual configuration needed)
-
----
-
-## tdx-cmdb-update
-**Status:** 🔴 DISABLED (Modification Tool - ALLOW_MODIFICATIONS=false)  
-**Source:** src/tools/cmdb.ts
-
-### Overview
-Fully updates a CI.
-
-### Status
-🔴 DISABLED: Modification tools disabled for safety. Enable via ALLOW_MODIFICATIONS environment variable only in authorized environments.
-
----
-
-## tdx-cmdb-delete
-**Status:** 🔴 DISABLED (Modification Tool - ALLOW_MODIFICATIONS=false)  
-**Source:** src/tools/cmdb.ts
-
-### Overview
-Deletes a CI.
-
-### Status
-🔴 DISABLED: Modification tools disabled for safety. Enable via ALLOW_MODIFICATIONS environment variable only in authorized environments.
-
----
-
-## tdx-cmdb-search
-**Status:** ✅ FULLY TESTED (May 12, 2026, 09:53 UTC)  
-**Source:** src/tools/cmdb.ts
-
-### Overview
-Searches and filters Configuration Items with multiple filtering options. Filters combine with AND logic.
-
-### Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `searchText` | string | NO | Full-text search on name/description |
-| `typeIds` | integer[] | NO | Filter by CI type IDs |
-| `isActive` | boolean | NO | Filter by active/inactive status |
-| `owningDepartmentIds` | integer[] | NO | Filter by owning department |
-| `locationIds` | integer[] | NO | Filter by location |
-| `maxResults` | integer | NO | Max results to return (default: 25) |
-| `appId` | integer | NO | Application ID (auto-defaults to TDAssets) |
-
-### Test Results
-✅ PASSED: Successfully searches CIs in TDAssets application
-✅ PASSED: Filtering parameters working correctly
-✅ PASSED: Auto-defaults to TDAssets application (no manual configuration needed)
-
----
-
-## tdx-cmdb-feed-add
-**Status:** 🔴 DISABLED (Modification Tool - ALLOW_MODIFICATIONS=false)  
-**Source:** src/tools/cmdb.ts
-
-### Overview
-Adds a note/comment to a CI's feed.
-
-### Status
-🔴 DISABLED: Modification tools disabled for safety. Enable via ALLOW_MODIFICATIONS environment variable only in authorized environments.
-
----
-
-## tdx-cmdb-add-relationship
-**Status:** 🔴 DISABLED (Modification Tool - ALLOW_MODIFICATIONS=false)  
-**Source:** src/tools/cmdb.ts
-
-### Overview
-Adds a relationship between two CIs.
-
-### Status
-🔴 DISABLED: Modification tools disabled for safety. Enable via ALLOW_MODIFICATIONS environment variable only in authorized environments.
-
-### Parameters (from source code)
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `id` | integer | YES | Source CI ID |
-| `otherItemId` | integer | YES | Target CI ID |
-| `typeId` | integer | YES | Relationship type ID |
-| `isInverse` | boolean | NO | Whether this is inverse relationship |
-| `appId` | integer | NO | Application ID |
-
-### Key Feature
-Unique capability for managing CMDB relationships and dependencies.
-
-### Status
-🔄 PENDING: Needs testing
-
----
-
-# KNOWLEDGE BASE
-
-## tdx-kb-create
-**Status:** 🔴 DISABLED (Modification Tool - ALLOW_MODIFICATIONS=false)  
-**Source:** src/tools/kb.ts
-
-### Overview
-Creates a new knowledge base article.
-
-### Status
-🔴 DISABLED: Modification tools disabled for safety. Enable via ALLOW_MODIFICATIONS environment variable only in authorized environments.
-
----
-
-## tdx-kb-get
-**Status:** ✅ FULLY TESTED (May 12, 2026, 09:53 UTC)  
-**Source:** src/tools/kb.ts
-
-### Overview
-Retrieves a knowledge base article by ID.
-
-### Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `id` | integer | YES | KB Article ID |
-| `appId` | integer | NO | Application ID (defaults to env TDX_KB_APP_ID) |
-
-### Test Results
-✅ PASSED: Successfully retrieves KB article details with all content and metadata.
-
----
-
-## tdx-kb-update
-**Status:** 🔴 DISABLED (Modification Tool - ALLOW_MODIFICATIONS=false)  
-**Source:** src/tools/kb.ts
-
-### Overview
-Updates a knowledge base article.
-
-### Status
-🔴 DISABLED: Modification tools disabled for safety. Enable via ALLOW_MODIFICATIONS environment variable only in authorized environments.
-
----
-
-## tdx-kb-delete
-**Status:** 🔴 DISABLED (Modification Tool - ALLOW_MODIFICATIONS=false)  
-**Source:** src/tools/kb.ts
-
-### Overview
-Deletes a knowledge base article.
-
-### Status
-🔴 DISABLED: Modification tools disabled for safety. Enable via ALLOW_MODIFICATIONS environment variable only in authorized environments.
-
----
-
-## tdx-kb-search
-**Status:** ✅ FULLY TESTED (May 12, 2026, 09:53 UTC)  
-**Source:** src/tools/kb.ts
-
-### Overview
-Searches knowledge base articles with filters.
-
-### Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `searchText` | string | NO | Full-text search on title/body |
-| `categoryIds` | integer[] | NO | Filter by category IDs |
-| `status` | integer | NO | Filter by status (1=Draft, 2=Approved, 3=Archived) |
-| `maxResults` | integer | NO | Max results to return (default: 25) |
-| `appId` | integer | NO | Application ID (defaults to env TDX_KB_APP_ID) |
-
-### Test Results
-✅ PASSED: Successfully searches KB articles with multiple filters
-
----
-
-# PROJECTS
-
-## tdx-project-create
-**Status:** 🔴 DISABLED (Modification Tool - ALLOW_MODIFICATIONS=false)  
-**Source:** src/tools/projects.ts
-
-### Overview
-Creates a new project.
-
-### Status
-🔴 DISABLED: Modification tools disabled for safety. Enable via ALLOW_MODIFICATIONS environment variable only in authorized environments.
-
----
-
-## tdx-project-get
-**Status:** ✅ FULLY TESTED (May 12, 2026, 09:53 UTC)  
-**Source:** src/tools/projects.ts
-
-### Overview
-Retrieves project details by ID.
-
-### Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `id` | integer | YES | Project ID |
-| `appId` | integer | NO | Application ID (defaults to env TDX_APP_ID) |
-
-### Test Results
-✅ PASSED: Successfully retrieves project details and metadata.
-
----
-
-## tdx-project-update
-**Status:** 🔴 DISABLED (Modification Tool - ALLOW_MODIFICATIONS=false)  
-**Source:** src/tools/projects.ts
-
-### Overview
-Updates project details.
-
-### Status
-🔴 DISABLED: Modification tools disabled for safety. Enable via ALLOW_MODIFICATIONS environment variable only in authorized environments.
-
----
-
-## tdx-project-search
-**Status:** ✅ FULLY TESTED (May 12, 2026, 09:53 UTC)  
-**Source:** src/tools/projects.ts
-
-### Overview
-Searches projects with filters.
-
-### Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `searchText` | string | NO | Full-text search on project name/description |
-| `statusIds` | integer[] | NO | Filter by project status IDs |
-| `priorityIds` | integer[] | NO | Filter by priority IDs |
-| `accountIds` | integer[] | NO | Filter by account/department IDs |
-| `managerUids` | string[] | NO | Filter by project manager UIDs |
-| `isActive` | boolean | NO | Filter by active status |
-| `maxResults` | integer | NO | Max results to return (default: 25) |
-| `appId` | integer | NO | Application ID (defaults to env TDX_APP_ID) |
-
-### Test Results
-✅ PASSED: Successfully searches and filters projects
-
----
-
-# PEOPLE
-
-## tdx-people-get
-**Status:** ✅ FULLY TESTED (May 12, 2026, 09:53 UTC)  
-**Source:** src/tools/people.ts
-
-### Overview
-Retrieves a person/user by UID.
-
-### Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `uid` | string | YES | Person UID |
-
-### Test Results
-✅ PASSED: Successfully retrieves person/user details.
-
----
-
-## tdx-people-search
-**Status:** ✅ FULLY TESTED (May 12, 2026, 09:53 UTC)  
-**Source:** src/tools/people.ts
-
-### Overview
-Searches for people with filters.
-
-### Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `searchText` | string | NO | Full-text search on name/email/username |
-| `firstName` | string | NO | Filter by first name |
-| `lastName` | string | NO | Filter by last name |
-| `primaryEmail` | string | NO | Filter by primary email |
-| `userName` | string | NO | Filter by username |
-| `isActive` | boolean | NO | Filter by active status |
-| `isEmployee` | boolean | NO | Filter by employee status |
-| `maxResults` | integer | NO | Max results to return (default: 25) |
-
-### Test Results
-✅ PASSED: Successfully searches and filters people by multiple criteria.
-
----
-
-## tdx-people-lookup
-**Status:** ✅ FULLY TESTED (May 12, 2026, 09:53 UTC)  
-**Source:** src/tools/people.ts
-
-### Overview
-Quick lookup of a person by name, email, or username.
-
-### Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `searchText` | string | YES | Name, email, or username to search for |
-| `maxResults` | integer | NO | Max results to return (default: 10) |
-
-### Test Results
-✅ PASSED: Successfully performs quick people lookups by name, email, or username.
-
----
-
-## tdx-people-update
-**Status:** 🔴 DISABLED (Modification Tool - ALLOW_MODIFICATIONS=false)  
-**Source:** src/tools/people.ts
-
-### Overview
-Updates a person/user profile.
-
-### Status
-🔴 DISABLED: Modification tools disabled for safety. Enable via ALLOW_MODIFICATIONS environment variable only in authorized environments.
-
----
-
-# ACCOUNTS
-
-## tdx-account-get
-**Status:** ✅ FULLY TESTED (May 12, 2026, 09:53 UTC)  
-**Source:** src/tools/accounts.ts
-
-### Overview
-Retrieves an account/department by ID.
-
-### Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `id` | integer | YES | Account/Department ID |
-
-### Test Results
-✅ PASSED: Successfully retrieves account/department details.
-
----
-
-## tdx-account-search
-**Status:** ✅ FULLY TESTED (May 12, 2026, 09:53 UTC)  
-**Source:** src/tools/accounts.ts
-
-### Overview
-Searches accounts/departments with filters.
-
-### Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `searchText` | string | NO | Full-text search on account name |
-| `isActive` | boolean | NO | Filter by active status |
-| `maxResults` | integer | NO | Max results to return (default: 25) |
-
-### Test Results
-✅ PASSED: Successfully searches and filters accounts/departments.
-
----
-
-# GROUPS
-
-## tdx-group-get
-**Status:** ✅ FULLY TESTED (May 12, 2026, 09:53 UTC)  
-**Source:** src/tools/groups.ts
-
-### Overview
-Retrieves a group by ID.
-
-### Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `id` | integer | YES | Group ID |
-
-### Test Results
-✅ PASSED: Successfully retrieves group details.
-
----
-
-## tdx-group-search
-**Status:** ✅ FULLY TESTED (May 12, 2026, 09:53 UTC)  
-**Source:** src/tools/groups.ts
-
-### Overview
-Searches for groups with filters.
-
-### Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `searchText` | string | NO | Full-text search on group name |
-| `hasAppId` | integer | NO | Filter by associated application ID |
-| `isActive` | boolean | NO | Filter by active status |
-| `maxResults` | integer | NO | Max results to return (default: 25) |
-
-### Test Results
-✅ PASSED: Successfully searches and filters groups.
-
----
-
-# STATUSES
-
-## tdx-statuses-get
-**Status:** ✅ TESTED  
-**Source:** src/tools/statuses.ts
-
-### Overview
-Retrieves available statuses for a TDX component type.
-
-### Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `componentType` | enum | YES | Component type: "tickets", "assets", "projects", "cmdb", or "knowledgebase" |
-| `appId` | integer | NO | Application ID |
-
-### Test Results
-
-**Test 1: Ticket Statuses**
-```
-Input: componentType="tickets"
-Result: ✅ PASS - Returned 5 statuses:
-  - 894: New
-  - 896: In Process
-  - 898: Closed
-  - 899: Cancelled
-  - 3625: Pending
-```
-
-### Return Structure
-```json
-[
-  {
-    "ID": 894,
-    "Name": "New",
-    "Order": 1,
-    "StatusClass": "New",
-    "IsActive": true,
-    "RequireGoesOffHold": false,
-    "DoNotReopen": false
-  }
-]
-```
-
-### Key Findings
-- ✅ Supports all 5 component types
-- ✅ Returns status IDs needed for filtering
-- ✅ Includes status ordering and behavioral flags
-- ✅ Essential reference for filter parameters
-
-### Usage
-Use this to discover valid statusIds for other tools' search/create operations.
-
----
-
-# CUSTOM ATTRIBUTES
-
-## tdx-attributes-get
-**Status:** ✅ TESTED  
-**Source:** src/tools/attributes.ts
-
-### Overview
-Retrieves custom attribute definitions for a TDX component.
-
-### Parameters
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `componentId` | integer | YES | Component ID (9=Ticket, 27=Asset, 63=CI, 39=KBArticle, 2=Project) |
-| `appId` | integer | NO | Application ID |
-| `associatedTypeId` | integer | NO | Filter by associated type ID |
-
-### Test Results
-
-**Test 1: Ticket Custom Attributes**
-```
-Input: componentId=9
-Result: ✅ PASS - Returned 305KB of attribute definitions
-```
-
-### Return Structure
-Returns large JSON object with attribute metadata including:
-- Attribute ID, name, type (text, number, dropdown, etc.)
-- Valid choices for dropdown/multi-select fields
-- Required/optional status
-- Display order
-- Custom validation rules
-
-### Key Findings
-- ✅ Provides complete custom field schema
-- ✅ Essential for understanding custom attribute structure before creating/updating items
-- ✅ Component IDs: 9=Ticket, 27=Asset, 63=CI, 39=KBArticle, 2=Project
-
-### Usage
-Use this to discover:
-- Available custom fields for each component
-- Valid choice values for dropdown fields
-- Required vs optional field status
-- Field types and validation rules
-
----
-
-## Key Patterns Across All Tools
-
-### Create/Update Pattern
-Most create/update operations follow this pattern:
-```
-Input: Object with title/name, description, and various ID references
-Output: Created/updated object with assigned ID and default values
-```
-
-### Search Pattern
-All search operations support:
-- `searchText` - Full-text search (plain text, no filter syntax)
-- Multiple ID-based filters (statusIds, priorityIds, etc.)
-- Filter combination with AND logic
-- `maxResults` parameter for pagination
-- `appId` parameter (optional, defaults to env TDX_APP_ID)
-
-### Feed/Comment Pattern
-Most entities (tickets, assets, CIs) support:
-- `feed-get` - Retrieve activity history
-- `feed-add` - Add new comment/note
-
-### Get/Lookup Pattern
-Most entities support:
-- `get` - Retrieve by ID
-- `lookup` - Quick search (people, some others)
-
----
-
-## References
-
-- [Testing Report](./TESTING_REPORT.md) - Test results and infrastructure verification
-- [Configuration guide](./COPILOT_INTEGRATION.md)
-- [Index file](./src/index.ts) - Tool registration
