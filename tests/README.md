@@ -13,7 +13,7 @@ Before running any test scripts, you need to configure your test parameters:
 
 2. **Edit `test-params.ps1` with your credentials:**
    - Replace `your-bearer-token-here` with your actual TDX API bearer token
-   - Update `$ServerUrl` if your server is at a different location (default: `http://10.210.1.38:3000/mcp`)
+   - Update `$ServerUrl` with your server's MCP endpoint (e.g., `http://your-server-host:3000/mcp`)
 
 3. **Note:** `test-params.ps1` is excluded from git (see `.gitignore`) to keep credentials secure.
 
@@ -99,7 +99,7 @@ Both test scripts use parameters from `test-params.ps1`:
 **test-params.ps1 content:**
 ```powershell
 # The MCP server URL endpoint (full path including /mcp)
-$ServerUrl = "http://10.210.1.38:3000/mcp"
+$ServerUrl = "http://your-server-host:3000/mcp"
 
 # The TDX API bearer token for authentication
 $BearerToken = "your-actual-token-here"
@@ -135,8 +135,8 @@ cd tests/
 .\test-server-status.ps1 -OutputFormat JSON
 
 # Both with custom parameters
-$url = "http://10.210.1.38:3000/mcp"
-$token = "your-token"
+$url = "http://your-server-host:3000/mcp"
+$token = "your-bearer-token"
 .\test-tools.ps1 -ServerUrl $url -BearerToken $token
 .\test-server-status.ps1 -ServerUrl $url -BearerToken $token
 ```
