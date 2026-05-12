@@ -56,6 +56,21 @@ export function registerAssetReadOnlyTools(server: McpServer, client: TdxClient)
       }
     }
   );
+
+  server.tool(
+    "tdx-asset-categories",
+    "Get all available asset categories/forms in TDX",
+    {},
+    async () => {
+      const app = defaultAppId;
+      try {
+        const result = await client.get(`/${app}/assets/forms`);
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      } catch (e: unknown) {
+        return { content: [{ type: "text", text: String(e) }], isError: true };
+      }
+    }
+  );
 }
 
 export function registerAssetTools(server: McpServer, client: TdxClient) {
@@ -196,21 +211,6 @@ export function registerAssetTools(server: McpServer, client: TdxClient) {
       if (params.notify !== undefined) body.Notify = params.notify;
       try {
         const result = await client.post(`/${app}/assets/${params.id}/feed`, body);
-        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-      } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
-      }
-    }
-  );
-
-  server.tool(
-    "tdx-asset-categories",
-    "Get all available asset categories/forms in TDX",
-    {},
-    async () => {
-      const app = defaultAppId;
-      try {
-        const result = await client.get(`/${app}/assets/forms`);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
         return { content: [{ type: "text", text: String(e) }], isError: true };
