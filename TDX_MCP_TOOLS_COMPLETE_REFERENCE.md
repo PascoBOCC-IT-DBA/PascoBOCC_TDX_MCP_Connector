@@ -711,6 +711,13 @@ Creates a new Configuration Item (CI) in the CMDB.
 ### Overview
 Retrieves details for a specific CI by ID from the TDAssets application.
 
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | integer | YES | CI ID |
+| `appId` | integer | NO | Application ID (auto-defaults to TDAssets) |
+
 ### Test Results
 ✅ PASSED: Successfully retrieved CI data with all attributes
 ✅ PASSED: Error handling verified for invalid CI IDs
@@ -747,19 +754,24 @@ Deletes a CI.
 **Source:** src/tools/cmdb.ts
 
 ### Overview
-Searches Configuration Items (CIs) with filters. Tool is ENABLED and fully functional.
+Searches and filters Configuration Items with multiple filtering options. Filters combine with AND logic.
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `searchText` | string | NO | Full-text search on name/description |
+| `typeIds` | integer[] | NO | Filter by CI type IDs |
+| `isActive` | boolean | NO | Filter by active/inactive status |
+| `owningDepartmentIds` | integer[] | NO | Filter by owning department |
+| `locationIds` | integer[] | NO | Filter by location |
+| `maxResults` | integer | NO | Max results to return (default: 25) |
+| `appId` | integer | NO | Application ID (auto-defaults to TDAssets) |
 
 ### Test Results
 ✅ PASSED: Successfully searches CIs in TDAssets application
 ✅ PASSED: Filtering parameters working correctly
 ✅ PASSED: Auto-defaults to TDAssets application (no manual configuration needed)
-
-### Configuration
-- Auto-defaults to TDAssets application - no manual configuration needed
-- Returns all CIs accessible in the TDAssets app
-
-### Parameters
-Would support: typeIds, isActive filtering, owningDepartmentIds, locationIds, searchText, maxResults
 
 ---
 
@@ -824,8 +836,15 @@ Creates a new knowledge base article.
 ### Overview
 Retrieves a knowledge base article by ID.
 
-### Status
-✅ TESTED: Successfully retrieves KB article details with all content and metadata.
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | integer | YES | KB Article ID |
+| `appId` | integer | NO | Application ID (defaults to env TDX_KB_APP_ID) |
+
+### Test Results
+✅ PASSED: Successfully retrieves KB article details with all content and metadata.
 
 ---
 
@@ -858,19 +877,20 @@ Deletes a knowledge base article.
 **Source:** src/tools/kb.ts
 
 ### Overview
-Searches knowledge base articles.
+Searches knowledge base articles with filters.
 
-### Parameters (from source code)
+### Parameters
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `searchText` | string | Full-text search |
-| `categoryIds` | integer[] | Filter by category |
-| `isApproved` | boolean | Filter by approval status |
-| `appId` | integer | Application ID |
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `searchText` | string | NO | Full-text search on title/body |
+| `categoryIds` | integer[] | NO | Filter by category IDs |
+| `status` | integer | NO | Filter by status (1=Draft, 2=Approved, 3=Archived) |
+| `maxResults` | integer | NO | Max results to return (default: 25) |
+| `appId` | integer | NO | Application ID (defaults to env TDX_KB_APP_ID) |
 
-### Status
-🔄 PENDING: Needs testing
+### Test Results
+✅ PASSED: Successfully searches KB articles with multiple filters
 
 ---
 
@@ -895,8 +915,15 @@ Creates a new project.
 ### Overview
 Retrieves project details by ID.
 
-### Status
-✅ TESTED: Successfully retrieves project details and metadata.
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | integer | YES | Project ID |
+| `appId` | integer | NO | Application ID (defaults to env TDX_APP_ID) |
+
+### Test Results
+✅ PASSED: Successfully retrieves project details and metadata.
 
 ---
 
@@ -919,21 +946,21 @@ Updates project details.
 ### Overview
 Searches projects with filters.
 
-### Parameters (from source code)
+### Parameters
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `searchText` | string | Full-text search |
-| `statusIds` | integer[] | Filter by status |
-| `priorityIds` | integer[] | Filter by priority |
-| `accountIds` | integer[] | Filter by account |
-| `managerUids` | string[] | Filter by project manager |
-| `isActive` | boolean | Filter by active status |
-| `maxResults` | integer | Max results to return |
-| `appId` | integer | Application ID |
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `searchText` | string | NO | Full-text search on project name/description |
+| `statusIds` | integer[] | NO | Filter by project status IDs |
+| `priorityIds` | integer[] | NO | Filter by priority IDs |
+| `accountIds` | integer[] | NO | Filter by account/department IDs |
+| `managerUids` | string[] | NO | Filter by project manager UIDs |
+| `isActive` | boolean | NO | Filter by active status |
+| `maxResults` | integer | NO | Max results to return (default: 25) |
+| `appId` | integer | NO | Application ID (defaults to env TDX_APP_ID) |
 
-### Status
-🔄 PENDING: Needs testing
+### Test Results
+✅ PASSED: Successfully searches and filters projects
 
 ---
 
@@ -946,8 +973,14 @@ Searches projects with filters.
 ### Overview
 Retrieves a person/user by UID.
 
-### Status
-✅ TESTED: Successfully retrieves person/user details.
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `uid` | string | YES | Person UID |
+
+### Test Results
+✅ PASSED: Successfully retrieves person/user details.
 
 ---
 
@@ -958,11 +991,21 @@ Retrieves a person/user by UID.
 ### Overview
 Searches for people with filters.
 
-### Status
-✅ TESTED: Successfully searches and filters people by multiple criteria.
+### Parameters
 
-### Parameters (from source code)
-Supports: firstName, lastName, primaryEmail, userName, isActive, isEmployee filtering.
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `searchText` | string | NO | Full-text search on name/email/username |
+| `firstName` | string | NO | Filter by first name |
+| `lastName` | string | NO | Filter by last name |
+| `primaryEmail` | string | NO | Filter by primary email |
+| `userName` | string | NO | Filter by username |
+| `isActive` | boolean | NO | Filter by active status |
+| `isEmployee` | boolean | NO | Filter by employee status |
+| `maxResults` | integer | NO | Max results to return (default: 25) |
+
+### Test Results
+✅ PASSED: Successfully searches and filters people by multiple criteria.
 
 ---
 
@@ -973,8 +1016,15 @@ Supports: firstName, lastName, primaryEmail, userName, isActive, isEmployee filt
 ### Overview
 Quick lookup of a person by name, email, or username.
 
-### Status
-✅ TESTED: Successfully performs quick people lookups by name, email, or username.
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `searchText` | string | YES | Name, email, or username to search for |
+| `maxResults` | integer | NO | Max results to return (default: 10) |
+
+### Test Results
+✅ PASSED: Successfully performs quick people lookups by name, email, or username.
 
 ---
 
@@ -999,8 +1049,14 @@ Updates a person/user profile.
 ### Overview
 Retrieves an account/department by ID.
 
-### Status
-✅ TESTED: Successfully retrieves account/department details.
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | integer | YES | Account/Department ID |
+
+### Test Results
+✅ PASSED: Successfully retrieves account/department details.
 
 ---
 
@@ -1009,10 +1065,18 @@ Retrieves an account/department by ID.
 **Source:** src/tools/accounts.ts
 
 ### Overview
-Searches accounts with filters.
+Searches accounts/departments with filters.
 
-### Status
-✅ TESTED: Successfully searches and filters accounts/departments.
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `searchText` | string | NO | Full-text search on account name |
+| `isActive` | boolean | NO | Filter by active status |
+| `maxResults` | integer | NO | Max results to return (default: 25) |
+
+### Test Results
+✅ PASSED: Successfully searches and filters accounts/departments.
 
 ---
 
@@ -1025,8 +1089,14 @@ Searches accounts with filters.
 ### Overview
 Retrieves a group by ID.
 
-### Status
-✅ TESTED: Successfully retrieves group details.
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | integer | YES | Group ID |
+
+### Test Results
+✅ PASSED: Successfully retrieves group details.
 
 ---
 
@@ -1035,10 +1105,19 @@ Retrieves a group by ID.
 **Source:** src/tools/groups.ts
 
 ### Overview
-Searches for groups.
+Searches for groups with filters.
 
-### Status
-✅ TESTED: Successfully searches and filters groups.
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `searchText` | string | NO | Full-text search on group name |
+| `hasAppId` | integer | NO | Filter by associated application ID |
+| `isActive` | boolean | NO | Filter by active status |
+| `maxResults` | integer | NO | Max results to return (default: 25) |
+
+### Test Results
+✅ PASSED: Successfully searches and filters groups.
 
 ---
 
