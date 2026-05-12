@@ -278,7 +278,7 @@ For deploying as a persistent HTTP service with API key authentication:
 1. See [DEPLOYMENT_UBUNTU.md](DEPLOYMENT_UBUNTU.md) for Ubuntu server setup
 2. See [COPILOT_INTEGRATION.md](COPILOT_INTEGRATION.md) for Copilot Studio integration
 
-The HTTP wrapper (`src/http-wrapper.js`) spawns MCP server processes on-demand and exposes them via REST endpoints, allowing:
+The HTTP wrapper (`src/http-wrapper.ts`) spawns MCP server processes on-demand and exposes them via REST endpoints, allowing:
 - Persistent service with systemd auto-restart
 - API key authentication support
 - Integration with Microsoft Copilot Studio
@@ -336,10 +336,7 @@ With the TDX MCP tools available, you can ask:
 TDX-MCP/
   package.json
   tsconfig.json
-  setup-windows.ps1        # Windows setup wizard
-  .vscode/
-    mcp.json               # GitHub Copilot Chat MCP configuration
-    settings.json          # VS Code input variable definitions
+  setup-ubuntu.sh          # Ubuntu server setup
   src/
     index.ts               # Main MCP server entry point
     auth.ts                # TDX authentication (token management)
