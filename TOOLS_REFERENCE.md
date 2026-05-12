@@ -89,7 +89,7 @@ Retrieves full details for a specific ticket by ID.
 - `id` (integer, required) - Ticket ID
 - `appId` (integer, optional) - Application ID (defaults to TDX_APP_ID)
 
-**Returns:** Complete single ticket object. Example structure (same as tdx-ticket-search result format, typically 55+ fields).
+**Returns:** Complete single ticket object (includes attachments, tasks, feed entries, and custom attributes). Example structure (same as tdx-ticket-search result format with 55+ fields).
 
 ---
 
@@ -244,7 +244,39 @@ Retrieves full details for a specific asset by ID.
 - `id` (integer, required) - Asset ID
 - `appId` (integer, optional) - Application ID (defaults to TDX_ASSETS_APP_ID or TDX_APP_ID)
 
-**Returns:** Complete single asset object (includes custom attributes and attachments). Example structure matches tdx-asset-search result format.
+**Returns:** Complete single asset object (includes custom attributes and attachments). Example structure:
+```json
+{
+  "ID": 33103,
+  "AppID": 116,
+  "AppName": "Assets/CIs",
+  "FormID": 1773,
+  "FormName": "Computer Asset Form",
+  "ProductModelID": 2310,
+  "ProductModelName": "S08J00",
+  "ManufacturerID": 1169,
+  "ManufacturerName": "Lenovo",
+  "SupplierID": 969,
+  "SupplierName": "Computers at Work d/b/a vTech io",
+  "StatusID": 1032,
+  "StatusName": "Lottery",
+  "LocationID": 12008,
+  "LocationName": "ISB Annex - Information Technology",
+  "Tag": "PW02RB2P",
+  "SerialNumber": "PW02RB2P",
+  "Name": "BCCIT171L",
+  "PurchaseCost": 0,
+  "AcquisitionDate": "2022-07-21T04:00:00Z",
+  "OwningDepartmentID": 2356,
+  "OwningDepartmentName": "Information Technology",
+  "CreatedDate": "2022-12-22T17:58:23.087Z",
+  "CreatedFullName": "Samantha Grahn",
+  "ModifiedDate": "2025-12-02T17:16:21.267Z",
+  "ModifiedFullName": "Rosalyn Padilla",
+  "ConfigurationItemID": 38407,
+  "Uri": "api/116/assets/33103"
+}
+```
 
 ---
 
@@ -417,11 +449,35 @@ Retrieves full details for a specific configuration item (CI) by ID.
 
 **Parameters:**
 - `id` (integer, required) - CI ID
-- `appId` (integer, optional) - Application ID (always 116 for TDAssets; parameter for consistency)
+- `appId` (integer, optional) - Application ID (defaults to TDX_ASSETS_APP_ID)
 
-**Returns:** Complete single CI object with fields: ID, Name, TypeID, TypeName, FormID, FormName, IsActive, Description, OwningDepartmentID, OwningDepartmentName, LocationID, LocationName, ManufacturerID, ManufacturerName, SerialNumber, StatusID, StatusName, CreatedDate, ModifiedDate, CustomAttributes, and additional fields. Structure mirrors asset/CI objects from TDAssets application.
+**Returns:** Complete single CI object. Example structure:
+```json
+{
+  "ID": 39309,
+  "AppID": 116,
+  "AppName": "Assets/CIs",
+  "Name": "PCCKIT04W",
+  "TypeID": 1,
+  "TypeName": "Asset",
+  "FormID": 1773,
+  "FormName": "Computer Asset Form",
+  "IsSystemMaintained": true,
+  "BackingItemID": 33982,
+  "OwningDepartmentID": 2339,
+  "OwningDepartmentName": "Corrections",
+  "LocationID": 13457,
+  "LocationName": "PCDC - Kitchen",
+  "IsActive": true,
+  "CreatedDateUtc": "2022-12-27T03:20:33.5333333Z",
+  "CreatedFullName": "Samantha Grahn",
+  "ModifiedDateUtc": "2026-05-12T17:13:10.3766667Z",
+  "ModifiedFullName": "David Cecere",
+  "Uri": "api/116/cmdb/39309"
+}
+```
 
-**Notes:** CMDB always uses the TDAssets application (appId 116).
+**Notes:** CMDB uses the configured assets application via TDX_ASSETS_APP_ID environment variable.
 
 ---
 
@@ -438,7 +494,7 @@ Searches and filters configuration items with multiple filter options. All filte
 - `owningDepartmentIds` (integer[], optional) - Filter by owning department IDs
 - `locationIds` (integer[], optional) - Filter by location IDs
 - `maxResults` (integer, optional) - Max results to return (default: 25)
-- `appId` (integer, optional) - Application ID (defaults to 116 for TDAssets)
+- `appId` (integer, optional) - Application ID (defaults to TDX_ASSETS_APP_ID)
 
 **Returns:** Array of CI objects. Example CI structure:
 ```json
@@ -466,7 +522,7 @@ Searches and filters configuration items with multiple filter options. All filte
 }
 ```
 
-**Notes:** CMDB always uses the TDAssets application (appId 116). Large result sets may timeout; use specific filters to narrow results.
+**Notes:** CMDB uses the configured assets application via TDX_ASSETS_APP_ID environment variable. Large result sets may timeout; use specific filters to narrow results.
 
 ---
 
@@ -564,7 +620,32 @@ Retrieves a knowledge base article by ID.
 - `id` (integer, required) - KB article ID
 - `appId` (integer, optional) - Application ID (defaults to TDX_KB_APP_ID or TDX_APP_ID)
 
-**Returns:** Complete single KB article object. Example structure (same as tdx-kb-search result format with all article fields including full HTML body).
+**Returns:** Complete single KB article object. Example structure:
+```json
+{
+  "ID": 6153,
+  "AppID": 114,
+  "AppName": "Client Portal",
+  "CategoryID": 711,
+  "CategoryName": "Accounts & Access",
+  "Subject": "How to Reset Your Password in Pasco365",
+  "Body": "<div class=\"gutter-top break-word...\">HTML content...</div>",
+  "Summary": "This document will help those who need to reset their County password...",
+  "Status": 3,
+  "StatusName": "Approved",
+  "Order": 1,
+  "IsPublished": true,
+  "IsPublic": true,
+  "CreatedDate": "2023-07-10T20:21:23.79Z",
+  "CreatedFullName": "Alexis Garton",
+  "ModifiedDate": "2023-07-11T12:46:30.067Z",
+  "ModifiedFullName": "Alexis Garton",
+  "OwningGroupID": 370,
+  "OwningGroupName": "Desktop Support",
+  "Tags": null,
+  "RevisionNumber": 2
+}
+```
 
 ---
 
@@ -675,7 +756,33 @@ Retrieves project details by ID.
 **Parameters:**
 - `id` (integer, required) - Project ID
 
-**Returns:** Complete single project object. Example structure (same as tdx-project-search result format).
+**Returns:** Complete single project object. Example structure:
+```json
+{
+  "ID": 927,
+  "Name": "Enterprise Credit Card Processing",
+  "AccountID": 2356,
+  "AccountName": "Information Technology",
+  "StatusID": 873,
+  "StatusName": "In Process",
+  "PriorityID": 1127,
+  "PriorityName": "P5",
+  "Description": "",
+  "AdminUID": "763e3bc1-5322-ed11-bd6e-0050f2f4ae01",
+  "AdminName": "Samantha Grahn",
+  "AdminEmail": "sgrahn@pascocountyfl.net",
+  "CreatedDate": "2022-11-29T14:21:11.313Z",
+  "ModifiedDate": "2025-07-21T12:56:12.57Z",
+  "PercentComplete": 100,
+  "IsActive": true,
+  "StartDate": "2021-11-02T00:00:00Z",
+  "EndDate": "2023-03-31T00:00:00Z",
+  "TypeID": 758,
+  "TypeName": "Software Implementation",
+  "EstimatedHours": 0,
+  "BudgetedHours": 0
+}
+```
 
 ---
 
@@ -772,7 +879,31 @@ Retrieves a person/user by UID.
 **Parameters:**
 - `uid` (string, required) - Person UID
 
-**Returns:** Complete single person object. Example structure (same as tdx-people-search result format).
+**Returns:** Complete single person object. Example structure:
+```json
+{
+  "UID": "37b3743f-adf0-f011-93dc-dac58e0fb9ad",
+  "FullName": "a test4",
+  "FirstName": "a",
+  "LastName": "test4",
+  "UserName": "atest4@pascocountyfl.net",
+  "PrimaryEmail": "atest4@pascocountyfl.net",
+  "IsActive": true,
+  "IsEmployee": true,
+  "DefaultAccountID": 2356,
+  "DefaultAccountName": "Information Technology",
+  "Company": "Information Technology",
+  "Title": "",
+  "WorkPhone": "",
+  "MobilePhone": "",
+  "CreatedDate": "2023-07-10T20:21:23.79Z",
+  "TZID": 2,
+  "TZName": "(GMT-05:00)Eastern Time(US and Canada)",
+  "SecurityRoleName": "Client",
+  "ReportsToUID": "37b3743f-adf0-f011-93dc-dac58e0fb9ad",
+  "ReportsToFullName": "a test4"
+}
+```
 
 ---
 
@@ -862,7 +993,33 @@ Retrieves an account/department by ID.
 **Parameters:**
 - `id` (integer, required) - Account/Department ID
 
-**Returns:** Complete single account object. Example structure (same as tdx-account-search result format).
+**Returns:** Complete single account object. Example structure:
+```json
+{
+  "ID": 2388,
+  "Name": "6th Judicial",
+  "ParentID": 2330,
+  "ParentName": "External",
+  "IsActive": true,
+  "Address1": "",
+  "City": "",
+  "StateName": "",
+  "PostalCode": "",
+  "Country": "",
+  "Phone": "",
+  "Fax": "",
+  "Url": "",
+  "Notes": "",
+  "CreatedDate": "2022-09-15T14:49:00Z",
+  "ModifiedDate": "2022-09-15T14:49:00Z",
+  "Code": "",
+  "IndustryID": 0,
+  "IndustryName": null,
+  "ManagerUID": "00000000-0000-0000-0000-000000000000",
+  "ManagerFullName": null,
+  "Attributes": ""
+}
+```
 
 ---
 
@@ -918,7 +1075,19 @@ Retrieves a group by ID.
 **Parameters:**
 - `id` (integer, required) - Group ID
 
-**Returns:** Complete single group object. Example structure (same as tdx-group-search result format).
+**Returns:** Complete single group object. Example structure:
+```json
+{
+  "ID": 371,
+  "Name": "Accela Support",
+  "Description": "Accela Support group for ticketing",
+  "IsActive": true,
+  "ExternalID": "",
+  "CreatedDate": "2022-09-13T19:36:01.69Z",
+  "ModifiedDate": "2022-09-15T15:15:02.83Z",
+  "PlatformApplications": ""
+}
+```
 
 ---
 
