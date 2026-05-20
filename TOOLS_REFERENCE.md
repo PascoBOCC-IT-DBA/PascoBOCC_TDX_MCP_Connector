@@ -294,6 +294,12 @@ Searches and filters assets with multiple filter options. All filters combine wi
 - `locationIds` (integer[], optional) - Filter by location IDs
 - `modelIds` (integer[], optional) - Filter by asset model IDs
 - `manufacturerIds` (integer[], optional) - Filter by manufacturer IDs
+- `createdDateStart` (string, optional) - Filter by creation date start (ISO 8601 format, e.g., "2026-04-01T00:00:00Z")
+- `createdDateEnd` (string, optional) - Filter by creation date end (ISO 8601 format, e.g., "2026-04-30T23:59:59Z")
+- `modifiedDateStart` (string, optional) - Filter by modification date start (ISO 8601 format)
+- `modifiedDateEnd` (string, optional) - Filter by modification date end (ISO 8601 format)
+- `acquisitionDateStart` (string, optional) - Filter by acquisition date start (ISO 8601 format)
+- `acquisitionDateEnd` (string, optional) - Filter by acquisition date end (ISO 8601 format)
 - `maxResults` (integer, optional) - Max results to return (default: 25)
 - `appId` (integer, optional) - Application ID (defaults to TDX_ASSETS_APP_ID or TDX_APP_ID)
 
@@ -615,7 +621,7 @@ Fully updates a configuration item (all fields must be provided).
 Deletes a configuration item.
 
 **Parameters:**
-- `id` (integer, required) - CI ID
+ - `id` (integer, required) - CI ID
 
 **Status:** Modification tools disabled for safety. Enable via `ALLOW_MODIFICATIONS=true` environment variable only in authorized environments.
 

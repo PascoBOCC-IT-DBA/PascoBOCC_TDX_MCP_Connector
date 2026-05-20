@@ -542,8 +542,8 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // API Key authentication (if configured, but allow /health without auth)
-  if (API_KEY && req.url !== '/health' && req.url !== '/') {
+  // API Key authentication (if configured, but allow /health and /tools without auth)
+  if (API_KEY && req.url !== '/health' && req.url !== '/tools' && req.url !== '/' && req.url !== '/status') {
     const authHeader = req.headers.authorization || '';
     const providedKey = authHeader.replace('Bearer ', '').trim();
     

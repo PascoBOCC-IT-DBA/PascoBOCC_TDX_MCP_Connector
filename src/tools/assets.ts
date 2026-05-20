@@ -35,6 +35,12 @@ export function registerAssetReadOnlyTools(server: McpServer, client: TdxClient)
       locationIds: z.array(z.number()).optional().describe("Filter by location IDs"),
       modelIds: z.array(z.number()).optional().describe("Filter by model IDs"),
       manufacturerIds: z.array(z.number()).optional().describe("Filter by manufacturer IDs"),
+      createdDateStart: z.string().optional().describe("Filter by creation date start (ISO 8601 format)"),
+      createdDateEnd: z.string().optional().describe("Filter by creation date end (ISO 8601 format)"),
+      modifiedDateStart: z.string().optional().describe("Filter by modification date start (ISO 8601 format)"),
+      modifiedDateEnd: z.string().optional().describe("Filter by modification date end (ISO 8601 format)"),
+      acquisitionDateStart: z.string().optional().describe("Filter by acquisition date start (ISO 8601 format)"),
+      acquisitionDateEnd: z.string().optional().describe("Filter by acquisition date end (ISO 8601 format)"),
       maxResults: z.number().optional().describe("Max results to return (default 25)"),
     },
     async (params) => {
@@ -47,6 +53,12 @@ export function registerAssetReadOnlyTools(server: McpServer, client: TdxClient)
       if (params.locationIds !== undefined) body.LocationIDs = params.locationIds;
       if (params.modelIds !== undefined) body.ModelIDs = params.modelIds;
       if (params.manufacturerIds !== undefined) body.ManufacturerIDs = params.manufacturerIds;
+      if (params.createdDateStart !== undefined) body.CreatedDateStart = params.createdDateStart;
+      if (params.createdDateEnd !== undefined) body.CreatedDateEnd = params.createdDateEnd;
+      if (params.modifiedDateStart !== undefined) body.ModifiedDateStart = params.modifiedDateStart;
+      if (params.modifiedDateEnd !== undefined) body.ModifiedDateEnd = params.modifiedDateEnd;
+      if (params.acquisitionDateStart !== undefined) body.AcquisitionDateStart = params.acquisitionDateStart;
+      if (params.acquisitionDateEnd !== undefined) body.AcquisitionDateEnd = params.acquisitionDateEnd;
       if (params.maxResults !== undefined) body.MaxResults = params.maxResults;
       try {
         const result = await client.post(`/${app}/assets/search`, body);
