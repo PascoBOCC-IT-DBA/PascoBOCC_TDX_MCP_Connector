@@ -23,12 +23,12 @@ This server exposes **43 tools** across **10 domains** — tickets, assets, CMDB
 
 The server uses a **safety-by-default architecture** that separates read-only tools from modification tools:
 
-- **Read-Only Tools (17)** — Always available by default
+- **Always-Available Tools (21)** — Read-only access by default
   - `get`, `search`, `lookup` operations across all domains
   - No data changes, safe for exploration and analysis
   - Examples: `tdx-ticket-search`, `tdx-asset-get`, `tdx-people-lookup`
 
-- **Modification Tools (26)** — Disabled by default, enable explicitly
+- **Modification Tools (22)** — Disabled by default, enable explicitly
   - `create`, `update`, `patch`, `delete`, and `feed-add` operations
   - Require `ALLOW_MODIFICATIONS=true` environment variable to enable
   - Examples: `tdx-ticket-create`, `tdx-asset-update`, `tdx-cmdb-delete`
@@ -45,7 +45,7 @@ This design prevents accidental data changes when the server is first deployed. 
 | `TDX_APP_ID` | Yes | Default TDX application ID (integer) |
 | `TDX_ASSETS_APP_ID` | No | TDX application ID for asset operations (integer). If not set, defaults to `TDX_APP_ID` |
 | `TDX_KB_APP_ID` | No | TDX application ID for knowledge base operations (integer). If not set, defaults to `TDX_APP_ID` |
-| `ALLOW_MODIFICATIONS` | No | Enable/disable modification tools. Set to `"true"` to enable 26 modification tools (create, update, delete). Default is `"false"` (safe mode - only 17 read-only tools accessible) |
+| `ALLOW_MODIFICATIONS` | No | Enable/disable modification tools. Set to `"true"` to enable 22 modification tools (create, update, delete). Default is `"false"` (safe mode - only 21 always-available tools accessible) |
 
 ## Architecture
 
@@ -104,11 +104,11 @@ The HTTP wrapper maintains a warm pool of **5 MCP server processes** to minimize
 
 This ensures consistent sub-100ms response times for tool calls.
 
-## Tools (43 Total: 17 Read-Only + 26 Modification)
+## Tools (43 Total: 21 Always-Available + 22 Modification)
 
 All tools that operate within an application accept an optional `appId` parameter to override the default from `TDX_APP_ID`.
 
-**Legend:** 🔒 = Read-only (always available) | ✏️ = Modification (requires `ALLOW_MODIFICATIONS=true`)
+**Legend:** 🔒 = Always available (read-only access) | ✏️ = Modification (requires `ALLOW_MODIFICATIONS=true`)
 
 ### Tickets (9 tools: 3 read-only + 6 modification)
 
