@@ -1269,7 +1269,7 @@ Retrieves custom attribute definitions for a TDX component type.
 **Search Pattern:**
 - All search tools support full-text `searchText` (plain text, no filter syntax)
 - Multiple filters combine with AND logic
-- `maxResults` parameter controls pagination (default: 25)
+- `maxResults` parameter controls pagination: Tickets/Assets/Projects default to 100 (5000 with date filters); other tools default to 25
 - Empty results return empty array without error
 
 **Get Pattern:**
