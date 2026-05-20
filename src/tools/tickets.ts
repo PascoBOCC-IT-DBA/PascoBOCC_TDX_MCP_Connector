@@ -48,6 +48,18 @@ export function registerTicketReadOnlyTools(server: McpServer, client: TdxClient
       responsibleUids: z.array(z.string()).optional().describe("Filter by responsible person UIDs"),
       responsibleGroupIds: z.array(z.number()).optional().describe("Filter by responsible group IDs"),
       requestorUids: z.array(z.string()).optional().describe("Filter by requestor UIDs"),
+      createdDateStart: z.string().optional().describe("Filter by creation date start (ISO 8601 format)"),
+      createdDateEnd: z.string().optional().describe("Filter by creation date end (ISO 8601 format)"),
+      modifiedDateStart: z.string().optional().describe("Filter by modification date start (ISO 8601 format)"),
+      modifiedDateEnd: z.string().optional().describe("Filter by modification date end (ISO 8601 format)"),
+      respondByDateStart: z.string().optional().describe("Filter by respond by date start (ISO 8601 format)"),
+      respondByDateEnd: z.string().optional().describe("Filter by respond by date end (ISO 8601 format)"),
+      closeByDateStart: z.string().optional().describe("Filter by resolve by date start (ISO 8601 format)"),
+      closeByDateEnd: z.string().optional().describe("Filter by resolve by date end (ISO 8601 format)"),
+      closedDateStart: z.string().optional().describe("Filter by closed date start (ISO 8601 format)"),
+      closedDateEnd: z.string().optional().describe("Filter by closed date end (ISO 8601 format)"),
+      respondedDateStart: z.string().optional().describe("Filter by responded date start (ISO 8601 format)"),
+      respondedDateEnd: z.string().optional().describe("Filter by responded date end (ISO 8601 format)"),
       maxResults: z.number().optional().describe("Max results to return (default 25)"),
     },
     async (params) => {
@@ -61,6 +73,18 @@ export function registerTicketReadOnlyTools(server: McpServer, client: TdxClient
       if (params.responsibleUids !== undefined) body.ResponsibilityUids = params.responsibleUids;
       if (params.responsibleGroupIds !== undefined) body.ResponsibilityGroupIDs = params.responsibleGroupIds;
       if (params.requestorUids !== undefined) body.RequestorUids = params.requestorUids;
+      if (params.createdDateStart !== undefined) body.CreatedDateFrom = params.createdDateStart;
+      if (params.createdDateEnd !== undefined) body.CreatedDateTo = params.createdDateEnd;
+      if (params.modifiedDateStart !== undefined) body.ModifiedDateFrom = params.modifiedDateStart;
+      if (params.modifiedDateEnd !== undefined) body.ModifiedDateTo = params.modifiedDateEnd;
+      if (params.respondByDateStart !== undefined) body.RespondByDateFrom = params.respondByDateStart;
+      if (params.respondByDateEnd !== undefined) body.RespondByDateTo = params.respondByDateEnd;
+      if (params.closeByDateStart !== undefined) body.CloseByDateFrom = params.closeByDateStart;
+      if (params.closeByDateEnd !== undefined) body.CloseByDateTo = params.closeByDateEnd;
+      if (params.closedDateStart !== undefined) body.ClosedDateFrom = params.closedDateStart;
+      if (params.closedDateEnd !== undefined) body.ClosedDateTo = params.closedDateEnd;
+      if (params.respondedDateStart !== undefined) body.RespondedDateFrom = params.respondedDateStart;
+      if (params.respondedDateEnd !== undefined) body.RespondedDateTo = params.respondedDateEnd;
       if (params.maxResults !== undefined) body.MaxResults = params.maxResults;
       try {
         const result = await client.post(`/${app}/tickets/search`, body);

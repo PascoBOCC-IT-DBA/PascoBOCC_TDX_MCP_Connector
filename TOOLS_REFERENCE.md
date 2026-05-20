@@ -37,6 +37,18 @@ Searches and filters TeamDynamix tickets. All filters combine with AND logic.
 - `requestorUids` (string[], optional) - Filter by requestor person UIDs
 - `responsibleUids` (string[], optional) - Filter by responsible person UIDs
 - `responsibleGroupIds` (integer[], optional) - Filter by responsible group IDs
+- `createdDateStart` (string, optional) - Filter by creation date start (ISO 8601 format)
+- `createdDateEnd` (string, optional) - Filter by creation date end (ISO 8601 format)
+- `modifiedDateStart` (string, optional) - Filter by modification date start (ISO 8601 format)
+- `modifiedDateEnd` (string, optional) - Filter by modification date end (ISO 8601 format)
+- `respondByDateStart` (string, optional) - Filter by respond by date start (ISO 8601 format)
+- `respondByDateEnd` (string, optional) - Filter by respond by date end (ISO 8601 format)
+- `closeByDateStart` (string, optional) - Filter by resolve by date start (ISO 8601 format)
+- `closeByDateEnd` (string, optional) - Filter by resolve by date end (ISO 8601 format)
+- `closedDateStart` (string, optional) - Filter by closed date start (ISO 8601 format)
+- `closedDateEnd` (string, optional) - Filter by closed date end (ISO 8601 format)
+- `respondedDateStart` (string, optional) - Filter by responded date start (ISO 8601 format)
+- `respondedDateEnd` (string, optional) - Filter by responded date end (ISO 8601 format)
 - `maxResults` (integer, optional) - Max results to return (default: 25)
 - `appId` (integer, optional) - Application ID (defaults to TDX_APP_ID)
 
