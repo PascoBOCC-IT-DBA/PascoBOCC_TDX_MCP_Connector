@@ -41,7 +41,7 @@ export function registerAssetReadOnlyTools(server: McpServer, client: TdxClient)
       modifiedDateEnd: z.string().optional().describe("Filter by modification date end (ISO 8601 format)"),
       acquisitionDateStart: z.string().optional().describe("Filter by acquisition date start (ISO 8601 format)"),
       acquisitionDateEnd: z.string().optional().describe("Filter by acquisition date end (ISO 8601 format)"),
-      maxResults: z.number().optional().describe("Max results to return (smart default: 5000 with date filters, 25 otherwise)"),
+      maxResults: z.number().optional().describe("Max results to return (smart default: 5000 with date filters, 100 otherwise)"),
     },
     async (params) => {
       const app = params.appId ?? defaultAppId;

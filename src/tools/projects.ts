@@ -33,7 +33,7 @@ export function registerProjectReadOnlyTools(server: McpServer, client: TdxClien
       createdDateEnd: z.string().optional().describe("Filter by created date end (ISO 8601)"),
       startsDateStart: z.string().optional().describe("Filter by project start date start (ISO 8601)"),
       startsDateEnd: z.string().optional().describe("Filter by project start date end (ISO 8601)"),
-      maxResults: z.number().optional().describe("Max results to return (default 25, or 5000 with date filters)"),
+      maxResults: z.number().optional().describe("Max results to return (smart default: 5000 with date filters, 100 otherwise)"),
     },
     async (params) => {
       const body: Record<string, unknown> = {};
