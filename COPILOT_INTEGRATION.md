@@ -524,15 +524,14 @@ Available environment variables (typically configured in Azure App Settings):
 
 Complete these steps in order before going live with Copilot Studio integration:
 
-1. **Local Testing** - Run `tests/test-comprehensive.ps1` and verify all tests pass
-2. **Azure App Service Deployed** - Service running on private URL with HTTPS
-3. **Environment Variables Configured** - Set all TDX and Azure credentials in App Settings
-4. **Entra/Azure Authentication Configured** - OAuth 2.0 app registration complete with credentials
-5. **Private URL Secured** - HTTPS enforced with Azure-managed certificate
-6. **Application Secrets Stored** - Client ID, Secret, Tenant ID securely in Azure Key Vault
-7. **Configure Copilot Studio** - Create OAuth connection and actions (see Copilot Studio Configuration section)
-8. **Test Connectivity** - Verify Copilot can authenticate and call the MCP service
-9. **Test Tool Invocations** - End-to-end testing of each action (especially CMDB with appId=116)
-10. **Monitor & Alert** - Enable Application Insights and config
-11. **Documentation** - Update agent prompt documentation with available tools
-12. **Go Live** - Publish actions to Copilot agents
+1. **Azure App Service Deployed** - Service running on private URL with HTTPS
+2. **Environment Variables Configured** - Set all TDX and Azure credentials in App Settings
+3. **Entra/Azure Authentication Configured** - OAuth 2.0 app registration complete with credentials
+4. **Private URL Secured** - HTTPS enforced with Azure-managed certificate
+5. **Application Secrets Stored** - Client ID, Secret, Tenant ID securely in Azure Key Vault
+6. **Configure Copilot Studio** - Create OAuth connection and actions (see Copilot Studio Configuration section)
+7. **Test Connectivity** - Verify Copilot can authenticate and call the MCP service
+8. **Test Tool Invocations** - End-to-end testing of each action (especially CMDB with appId=116)
+9. **Monitor & Alert** - Enable Application Insights and config
+10. **Documentation** - Update agent prompt documentation with available tools
+11. **Go Live** - Publish actions to Copilot agents
