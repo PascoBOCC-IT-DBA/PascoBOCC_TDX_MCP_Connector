@@ -41,7 +41,7 @@ export function registerAssetReadOnlyTools(server: McpServer, client: TdxClient)
       modifiedDateEnd: z.string().optional().describe("Filter by modification date end (ISO 8601 format)"),
       acquisitionDateStart: z.string().optional().describe("Filter by acquisition date start (ISO 8601 format)"),
       acquisitionDateEnd: z.string().optional().describe("Filter by acquisition date end (ISO 8601 format)"),
-      maxResults: z.number().optional().describe("Max results to return (default 25)"),
+      maxResults: z.number().optional().describe("Max results to return (smart default: 5000 with date filters, 25 otherwise)"),
     },
     async (params) => {
       const app = params.appId ?? defaultAppId;
@@ -59,7 +59,9 @@ export function registerAssetReadOnlyTools(server: McpServer, client: TdxClient)
       if (params.modifiedDateEnd !== undefined) body.ModifiedDateEnd = params.modifiedDateEnd;
       if (params.acquisitionDateStart !== undefined) body.AcquisitionDateStart = params.acquisitionDateStart;
       if (params.acquisitionDateEnd !== undefined) body.AcquisitionDateEnd = params.acquisitionDateEnd;
-      if (params.maxResults !== undefined) body.MaxResults = params.maxResults;
+      const hasDateFilter = params.createdDateStart !== undefined || params.createdDateEnd !== undefined || params.modifiedDateStart !== undefined || params.modifiedDateEnd !== undefined || params.acquisitionDateStart !== undefined || params.acquisitionDateEnd !== undefined;
+      const defaultMaxResults = hasDateFilter ? 5000 : 100;
+      body.MaxResults = params.maxResults ?? defaultMaxResults;
       try {
         const result = await client.post(`/${app}/assets/search`, body);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };

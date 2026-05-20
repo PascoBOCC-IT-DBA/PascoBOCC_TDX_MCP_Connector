@@ -29,7 +29,11 @@ export function registerProjectReadOnlyTools(server: McpServer, client: TdxClien
       accountIds: z.array(z.number()).optional().describe("Filter by account IDs"),
       managerUids: z.array(z.string()).optional().describe("Filter by project manager UIDs"),
       isActive: z.boolean().optional().describe("Filter by active status"),
-      maxResults: z.number().optional().describe("Max results to return (default 25)"),
+      createdDateStart: z.string().optional().describe("Filter by created date start (ISO 8601)"),
+      createdDateEnd: z.string().optional().describe("Filter by created date end (ISO 8601)"),
+      startsDateStart: z.string().optional().describe("Filter by project start date start (ISO 8601)"),
+      startsDateEnd: z.string().optional().describe("Filter by project start date end (ISO 8601)"),
+      maxResults: z.number().optional().describe("Max results to return (default 25, or 5000 with date filters)"),
     },
     async (params) => {
       const body: Record<string, unknown> = {};
@@ -39,7 +43,13 @@ export function registerProjectReadOnlyTools(server: McpServer, client: TdxClien
       if (params.accountIds !== undefined) body.AccountIDs = params.accountIds;
       if (params.managerUids !== undefined) body.ManagerUids = params.managerUids;
       if (params.isActive !== undefined) body.IsActive = params.isActive;
-      if (params.maxResults !== undefined) body.MaxResults = params.maxResults;
+      if (params.createdDateStart !== undefined) body.CreatedDateFrom = params.createdDateStart;
+      if (params.createdDateEnd !== undefined) body.CreatedDateTo = params.createdDateEnd;
+      if (params.startsDateStart !== undefined) body.Starts = params.startsDateStart;
+      if (params.startsDateEnd !== undefined) body.Ends = params.startsDateEnd;
+      const hasDateFilter = params.createdDateStart !== undefined || params.createdDateEnd !== undefined || params.startsDateStart !== undefined || params.startsDateEnd !== undefined;
+      const defaultMaxResults = hasDateFilter ? 5000 : 100;
+      body.MaxResults = params.maxResults ?? defaultMaxResults;
       try {
         const result = await client.post("/projects/search", body);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };

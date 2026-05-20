@@ -312,7 +312,7 @@ Searches and filters assets with multiple filter options. All filters combine wi
 - `modifiedDateEnd` (string, optional) - Filter by modification date end (ISO 8601 format)
 - `acquisitionDateStart` (string, optional) - Filter by acquisition date start (ISO 8601 format)
 - `acquisitionDateEnd` (string, optional) - Filter by acquisition date end (ISO 8601 format)
-- `maxResults` (integer, optional) - Max results to return (default: 25)
+- `maxResults` (integer, optional) - Max results to return (smart default: 5000 when any date filter is used, 100 otherwise)
 - `appId` (integer, optional) - Application ID (defaults to TDX_ASSETS_APP_ID or TDX_APP_ID)
 
 **Returns:** Array of asset objects. Example asset:
@@ -862,7 +862,11 @@ Searches projects with multiple filter options. All filters combine with AND log
 - `accountIds` (integer[], optional) - Filter by account/department IDs
 - `managerUids` (string[], optional) - Filter by project manager UIDs
 - `isActive` (boolean, optional) - Filter by active status
-- `maxResults` (integer, optional) - Max results to return (default: 25)
+- `createdDateStart` (string, optional) - Filter by created date start (ISO 8601 format)
+- `createdDateEnd` (string, optional) - Filter by created date end (ISO 8601 format)
+- `startsDateStart` (string, optional) - Filter by project start date start (ISO 8601 format)
+- `startsDateEnd` (string, optional) - Filter by project start date end (ISO 8601 format)
+- `maxResults` (integer, optional) - Max results to return (smart default: 5000 when date filters used, 100 otherwise)
 
 **Returns:** Array of project objects. Example structure of a single project:
 ```json
