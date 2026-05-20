@@ -49,8 +49,7 @@ Searches and filters TeamDynamix tickets. All filters combine with AND logic.
 - `closedDateEnd` (string, optional) - Filter by closed date end (ISO 8601 format)
 - `respondedDateStart` (string, optional) - Filter by responded date start (ISO 8601 format)
 - `respondedDateEnd` (string, optional) - Filter by responded date end (ISO 8601 format)
-- `maxResults` (integer, optional) - Max results to return (default: 25)
-- `appId` (integer, optional) - Application ID (defaults to TDX_APP_ID)
+- `maxResults` (integer, optional) - Max results to return (smart default: 5000 when date filters used, 100 otherwise)
 
 **Returns:** Array of ticket objects. Example ticket:
 ```json

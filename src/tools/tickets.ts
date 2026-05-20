@@ -60,7 +60,7 @@ export function registerTicketReadOnlyTools(server: McpServer, client: TdxClient
       closedDateEnd: z.string().optional().describe("Filter by closed date end (ISO 8601 format)"),
       respondedDateStart: z.string().optional().describe("Filter by responded date start (ISO 8601 format)"),
       respondedDateEnd: z.string().optional().describe("Filter by responded date end (ISO 8601 format)"),
-      maxResults: z.number().optional().describe("Max results to return (default 25)"),
+      maxResults: z.number().optional().describe("Max results to return (smart default: 5000 with date filters, 100 otherwise)"),
     },
     async (params) => {
       const app = params.appId ?? defaultAppId;
@@ -85,7 +85,16 @@ export function registerTicketReadOnlyTools(server: McpServer, client: TdxClient
       if (params.closedDateEnd !== undefined) body.ClosedDateTo = params.closedDateEnd;
       if (params.respondedDateStart !== undefined) body.RespondedDateFrom = params.respondedDateStart;
       if (params.respondedDateEnd !== undefined) body.RespondedDateTo = params.respondedDateEnd;
-      if (params.maxResults !== undefined) body.MaxResults = params.maxResults;
+      
+      // Smart maxResults default: 5000 if date filters present, 100 otherwise
+      const hasDateFilter = params.createdDateStart !== undefined || params.createdDateEnd !== undefined ||
+                            params.modifiedDateStart !== undefined || params.modifiedDateEnd !== undefined ||
+                            params.respondByDateStart !== undefined || params.respondByDateEnd !== undefined ||
+                            params.closeByDateStart !== undefined || params.closeByDateEnd !== undefined ||
+                            params.closedDateStart !== undefined || params.closedDateEnd !== undefined ||
+                            params.respondedDateStart !== undefined || params.respondedDateEnd !== undefined;
+      const defaultMaxResults = hasDateFilter ? 5000 : 100;
+      body.MaxResults = params.maxResults ?? defaultMaxResults;
       try {
         const result = await client.post(`/${app}/tickets/search`, body);
         // Add webLinks to each ticket in the results
