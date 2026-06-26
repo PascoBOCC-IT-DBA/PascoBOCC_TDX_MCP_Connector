@@ -1,0 +1,9 @@
+name: tdx-mcp-connector
+metadata:
+  description: TDX MCP Connector - Azure Container App deployment
+services:
+  web:
+    project: ./
+    docker:
+      path: ./Dockerfile
+    host: containerapp

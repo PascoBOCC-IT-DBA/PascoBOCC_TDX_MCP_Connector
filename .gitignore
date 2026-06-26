@@ -27,6 +27,7 @@ npm-debug.log*
 COPILOT_INTEGRATION.md
 tdx-mcp.service
 .mcpserver
+.azure/
 
 # Test & Query Scripts
 /tests
