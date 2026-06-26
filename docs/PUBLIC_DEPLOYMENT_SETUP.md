@@ -1,6 +1,8 @@
-# Public Deployment with Authentication - Setup Summary
+# Azure Container Apps Deployment - Quick Start Guide
 
-Your TDX MCP Connector is now configured for **public deployment to Azure Container Apps** with **API key authentication**.
+Your TDX MCP Connector is configured for **production-ready deployment to Azure Container Apps** with **API key authentication** and **auto-scaling**.
+
+> **This is the recommended deployment method** for all new deployments. For detailed information, see [AZURE_CONTAINER_APPS_DEPLOYMENT.md](AZURE_CONTAINER_APPS_DEPLOYMENT.md).
 
 ## ✅ What's Been Set Up
 
@@ -92,14 +94,19 @@ curl --bearer YOUR_API_KEY \
 ```
 
 ### Public Endpoints (No Auth Required)
-- `GET /health` - Health check
+- `GET /health` - Health check (for load balancers)
+
+### Protected Endpoints (Auth Required - Bearer Token)
 - `GET /status` - Service status
 - `GET /tools` - List available tools
-
-### Protected Endpoints (Auth Required)
 - `POST /mcp` - MCP tool calls
 - `GET /` - MCP HTTP transport
 - `POST /` - MCP HTTP transport
+
+**All endpoints except `/health` require an API key in the Authorization header:**
+```bash
+curl -H "Authorization: Bearer YOUR_API_KEY" https://your-app-url/status
+```
 
 ## 📊 What Gets Deployed
 

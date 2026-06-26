@@ -17,7 +17,19 @@ This server exposes **43 tools** across **10 domains** — tickets, assets, CMDB
 2. **Configure environment variables** (see [Environment Variables](#environment-variables) below)
    - Copy `.env.example` to `.env` and add your TDX credentials
 
-3. **For production deployment**, see [DEPLOYMENT_UBUNTU.md](DEPLOYMENT_UBUNTU.md) for Ubuntu server setup and [COPILOT_INTEGRATION.md](COPILOT_INTEGRATION.md) for Copilot Studio integration
+### Production Deployment
+
+**Recommended**: Deploy to **Azure Container Apps** for production use.
+
+See [docs/AZURE_CONTAINER_APPS_DEPLOYMENT.md](docs/AZURE_CONTAINER_APPS_DEPLOYMENT.md) for:
+- Azure Container Apps setup (recommended, managed service)
+- API key authentication
+- Auto-scaling and monitoring
+- Quick start deployment with `azd up`
+
+For other deployment options:
+- **Copilot Studio Integration**: [docs/COPILOT_INTEGRATION.md](docs/COPILOT_INTEGRATION.md)
+- **Legacy Ubuntu Deployment**: [docs/DEPLOYMENT_UBUNTU.md](docs/DEPLOYMENT_UBUNTU.md)
 
 ## Tool Availability & Safety-by-Default Design
 

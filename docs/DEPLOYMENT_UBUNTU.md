@@ -1,7 +1,11 @@
-# Ubuntu Deployment Guide - TDX MCP Connector
+# ⚠️ Ubuntu Deployment Guide (Legacy) - TDX MCP Connector
+
+> **Deprecated**: This guide is maintained for reference only. **New deployments should use [Azure Container Apps](AZURE_CONTAINER_APPS_DEPLOYMENT.md)**, which is the recommended production deployment method.
+>
+> For local development or if you have specific infrastructure requirements for self-hosted Ubuntu deployment, you may use this guide. Azure Container Apps provides better scalability, security, and reduced operational overhead.
 
 ## Overview
-This guide walks you through deploying the TDX MCP Connector to Ubuntu 24.04 LTS with systemd service management.
+This guide walks you through deploying the TDX MCP Connector to Ubuntu 24.04 LTS with systemd service management (legacy method).
 
 ## Prerequisites
 - Ubuntu 24.04 LTS server with SSH access

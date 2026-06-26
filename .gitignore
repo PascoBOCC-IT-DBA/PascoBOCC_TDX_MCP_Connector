@@ -24,7 +24,6 @@ Thumbs.db
 npm-debug.log*
 
 # Deployment & Configuration
-COPILOT_INTEGRATION.md
 tdx-mcp.service
 .mcpserver
 .azure/
