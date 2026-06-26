@@ -106,16 +106,6 @@ registerIfAllowed(() => registerAssetTools(server, client), "registerAssetTools"
 // ... etc for all domains ...
 ```
 
-### Process Pooling
-
-The HTTP wrapper maintains a warm pool of **5 MCP server processes** to minimize latency:
-- Cold process startup: 2-3 seconds
-- Pooled process reuse: <10ms
-- Pool size: 5 processes (minimum 2 warm, maximum 5)
-- Readiness detection: Waits for `[MCP Server Ready]` console signal
-
-This ensures consistent sub-100ms response times for tool calls.
-
 ## Tools (43 Total: 21 Always-Available + 22 Modification)
 
 All tools that operate within an application accept an optional `appId` parameter to override the default from `TDX_APP_ID`.
@@ -224,8 +214,9 @@ Common `componentId` values for `tdx-attributes-get`: `9` = Ticket, `27` = Asset
 ## Deployment
 
 For deployment instructions, see:
-- [DEPLOYMENT_UBUNTU.md](DEPLOYMENT_UBUNTU.md) for server deployment
-- [COPILOT_INTEGRATION.md](COPILOT_INTEGRATION.md) for AI client integration
+- [docs/AZURE_CONTAINER_APPS_DEPLOYMENT.md](docs/AZURE_CONTAINER_APPS_DEPLOYMENT.md) for Azure Container Apps (recommended)
+- [docs/DEPLOYMENT_UBUNTU.md](docs/DEPLOYMENT_UBUNTU.md) for Ubuntu server deployment (legacy)
+- [docs/COPILOT_INTEGRATION.md](docs/COPILOT_INTEGRATION.md) for AI client integration
 
 ## Documentation
 
@@ -233,12 +224,12 @@ For deployment instructions, see:
 
 | Document | Purpose |
 |----------|---------|
-| **[TOOLS_REFERENCE.md](TOOLS_REFERENCE.md)** | Complete reference for all 43 tools with parameters, return structures, and usage examples |
-| **[TESTING_REPORT.md](TESTING_REPORT.md)** | Test results, infrastructure verification, and testing methodology (20/43 tools tested, 43 tests passing) |
-| **[DEPLOYMENT_UBUNTU.md](DEPLOYMENT_UBUNTU.md)** | Ubuntu server deployment, systemd service setup, and production configuration |
-| **[COPILOT_INTEGRATION.md](COPILOT_INTEGRATION.md)** | GitHub Copilot Chat and Microsoft Copilot Studio integration instructions |
+| **[docs/TOOLS_REFERENCE.md](docs/TOOLS_REFERENCE.md)** | Complete reference for all 43 tools with parameters, return structures, and usage examples |
+| **[docs/AZURE_CONTAINER_APPS_DEPLOYMENT.md](docs/AZURE_CONTAINER_APPS_DEPLOYMENT.md)** | Azure Container Apps setup, deployment automation with `azd`, and production configuration (recommended) |
+| **[docs/DEPLOYMENT_UBUNTU.md](docs/DEPLOYMENT_UBUNTU.md)** | Ubuntu server deployment, systemd service setup, and legacy deployment configuration |
+| **[docs/COPILOT_INTEGRATION.md](docs/COPILOT_INTEGRATION.md)** | GitHub Copilot Chat and Microsoft Copilot Studio integration instructions |
 
-For complete tool documentation, see [TOOLS_REFERENCE.md](TOOLS_REFERENCE.md). For test results and infrastructure details, see [TESTING_REPORT.md](TESTING_REPORT.md).
+For complete tool documentation, see [docs/TOOLS_REFERENCE.md](docs/TOOLS_REFERENCE.md).
 
 ## Example Usage
 
@@ -259,15 +250,16 @@ With the TDX MCP tools available, you can ask:
 ## Project Structure
 
 ```
-TDX-MCP/
+PascoBOCC_TDX_MCP_Connector/
   package.json
   tsconfig.json
-  setup-ubuntu.sh          # Ubuntu server setup
   src/
     index.ts               # Main MCP server entry point
+    http-wrapper.ts        # HTTP server wrapper with process pooling
     auth.ts                # TDX authentication (token management)
     config.ts              # Configuration and validation
     tdx-client.ts          # TDX API client
+    asset-batcher.ts       # Asset batch processing utility
     tools/
       tickets.ts           # 9 ticket tools
       assets.ts            # 8 asset tools
@@ -279,5 +271,20 @@ TDX-MCP/
       groups.ts            # 2 group tools
       statuses.ts          # 1 status tool
       attributes.ts        # 1 custom attributes tool
+  deploy/
+    deploy-to-azure.sh     # Azure Container Apps deployment script
+    deploy-to-azure.ps1    # Azure Container Apps deployment (PowerShell)
+    azure-deploy.ps1       # Alternative Azure deployment script
+    azure.yaml             # Azure deployment configuration
+  infra/
+    main.bicep             # Infrastructure as Code template
+    main.parameters.json   # Bicep parameters
+  docs/
+    AZURE_CONTAINER_APPS_DEPLOYMENT.md  # Recommended deployment guide
+    DEPLOYMENT_UBUNTU.md   # Legacy Ubuntu deployment guide
+    COPILOT_INTEGRATION.md # AI client integration guide
+    TOOLS_REFERENCE.md     # Complete tool documentation
+  tests/
+    *.ps1, *.sh, *.js      # Various test and verification scripts
 ```
 
