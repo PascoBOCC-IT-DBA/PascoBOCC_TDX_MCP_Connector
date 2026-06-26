@@ -22,37 +22,62 @@ export class TdxClient {
     body?: unknown,
     query?: Record<string, string>
   ): Promise<unknown> {
-    const token = await this.auth.getToken();
-    let url = `${this.baseUrl}${path}`;
-
-    if (query) {
-      const params = new URLSearchParams(query);
-      url += `?${params.toString()}`;
-    }
-
-    const headers: Record<string, string> = {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    };
-
-    const res = await fetch(url, {
-      method,
-      headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`TDX API error ${res.status} ${method} ${path}: ${text}`);
-    }
-
-    const text = await res.text();
-    if (!text) return null;
-
+    console.error(`[TDX Client] ${method} ${path} - getting token...`);
+    const startTime = Date.now();
+    
     try {
-      return JSON.parse(text);
-    } catch {
-      return text;
+      const token = await this.auth.getToken();
+      const authTime = Date.now() - startTime;
+      console.error(`[TDX Client] Token obtained in ${authTime}ms`);
+      
+      let url = `${this.baseUrl}${path}`;
+
+      if (query) {
+        const params = new URLSearchParams(query);
+        url += `?${params.toString()}`;
+      }
+
+      const headers: Record<string, string> = {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      };
+
+      console.error(`[TDX Client] Making request to ${url}`);
+      const fetchStart = Date.now();
+      const res = await fetch(url, {
+        method,
+        headers,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      });
+      const fetchTime = Date.now() - fetchStart;
+      console.error(`[TDX Client] Response received in ${fetchTime}ms: HTTP ${res.status}`);
+
+      if (!res.ok) {
+        const text = await res.text();
+        console.error(`[TDX Client] ❌ API error: ${text.substring(0, 100)}`);
+        throw new Error(`TDX API error ${res.status} ${method} ${path}: ${text}`);
+      }
+
+      const text = await res.text();
+      if (!text) {
+        console.error(`[TDX Client] ✅ Empty response (${Date.now() - startTime}ms total)`);
+        return null;
+      }
+
+      try {
+        const result = JSON.parse(text);
+        console.error(`[TDX Client] ✅ Parsed JSON (${text.length} chars, ${Date.now() - startTime}ms total)`);
+        return result;
+      } catch {
+        console.error(`[TDX Client] ✅ Returned raw text (${text.length} chars, ${Date.now() - startTime}ms total)`);
+        return text;
+      }
+    } catch (err) {
+      const totalTime = Date.now() - startTime;
+      if (err instanceof Error) {
+        console.error(`[TDX Client] ❌ Error after ${totalTime}ms: ${err.message}`);
+      }
+      throw err;
     }
   }
 

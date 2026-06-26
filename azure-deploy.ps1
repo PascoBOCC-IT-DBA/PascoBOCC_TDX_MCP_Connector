@@ -155,7 +155,8 @@ $subscriptionId = $currentAccount.id
 # =======================
 Write-Header "Step 4: Configuring Resource Names"
 
-$resourceGroupName = "rg-tdx-mcp-$EnvironmentName"
+$timestamp = Get-Date -Format "yyyyMMddHHmm"
+$resourceGroupName = "rg-tdx-mcp-$EnvironmentName-$timestamp"
 $registryName = "crctdxmcp$EnvironmentName$(Get-Random -Minimum 1000 -Maximum 9999)"
 $containerAppName = "tdx-mcp-$EnvironmentName"
 $containerAppEnvName = "cae-$EnvironmentName"
@@ -167,26 +168,52 @@ Write-Info "Container App: $containerAppName"
 Write-Info "Location: $Location"
 
 # =======================
-# STEP 5: Create Resource Group
+# STEP 5: Create or Reuse Resource Group
 # =======================
-Write-Header "Step 5: Creating Azure Resource Group"
+Write-Header "Step 5: Setting up Resource Group"
 
-Write-Info "Creating resource group: $resourceGroupName..."
-$rgResult = az group create `
-    --name $resourceGroupName `
-    --location $Location `
-    --query "id" -o tsv
+Write-Info "Checking resource group: $resourceGroupName..."
+$rgExists = az group exists --name $resourceGroupName
 
-if (-not $rgResult) {
-    Exit-WithError "Failed to create resource group"
+if ($rgExists -eq "true") {
+    Write-Success "Resource group already exists: $resourceGroupName"
+} else {
+    Write-Info "Creating new resource group: $resourceGroupName..."
+    $rgResult = az group create `
+        --name $resourceGroupName `
+        --location $Location `
+        --query "id" -o tsv
+
+    if (-not $rgResult) {
+        Exit-WithError "Failed to create resource group"
+    }
+    Write-Success "Resource group created: $resourceGroupName"
 }
 
-Write-Success "Resource group created: $resourceGroupName"
+# =======================
+# STEP 5.5: Clean up Failed Container Registries
+# =======================
+Write-Header "Step 5.5: Cleaning Up Failed Registries"
+
+Write-Info "Checking for failed container registries..."
+$failedRegistries = az acr list --resource-group $resourceGroupName --output json 2>$null | ConvertFrom-Json
+
+if ($failedRegistries -and $failedRegistries.Count -gt 0) {
+    Write-Warning "Found $($failedRegistries.Count) existing registry/registries. Cleaning up..."
+    
+    foreach ($registry in $failedRegistries) {
+        Write-Info "Deleting registry: $($registry.name)..."
+        az acr delete --resource-group $resourceGroupName --name $registry.name --yes
+        Write-Success "Deleted: $($registry.name)"
+    }
+} else {
+    Write-Success "No failed registries to clean up"
+}
 
 # =======================
-# STEP 6: Build Docker Image
+# STEP 7: Build Docker Image
 # =======================
-Write-Header "Step 6: Building Docker Image"
+Write-Header "Step 7: Building Docker Image"
 
 Write-Info "Building Docker image (this may take 2-5 minutes)..."
 docker build -t tdx-mcp:latest .
@@ -207,6 +234,7 @@ $acrResult = az acr create `
     --resource-group $resourceGroupName `
     --name $registryName `
     --sku Basic `
+    --admin-enabled true `
     --query "loginServer" -o tsv
 
 if (-not $acrResult) {
@@ -244,10 +272,80 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Success "Image pushed to registry: $imageName"
 
+# Get registry credentials for Bicep deployment
+Write-Info "Retrieving registry credentials..."
+$registryPassword = az acr credential show --resource-group $resourceGroupName --name $registryName --query passwords[0].value -o tsv
+$registryUsername = az acr credential show --resource-group $resourceGroupName --name $registryName --query username -o tsv
+
+if (-not $registryPassword -or -not $registryUsername) {
+    Exit-WithError "Failed to retrieve registry credentials"
+}
+
+Write-Success "Registry credentials retrieved"
+
 # =======================
-# STEP 9: Deploy with Bicep
+# STEP 10: Deploy with Bicep
 # =======================
-Write-Header "Step 9: Deploying to Azure Container Apps"
+Write-Header "Step 10: Deploying to Azure Container Apps"
+
+# =======================
+# STEP 7: Create Container Registry
+# =======================
+Write-Header "Step 7: Creating Azure Container Registry"
+
+Write-Info "Creating container registry: $registryName..."
+$acrResult = az acr create `
+    --resource-group $resourceGroupName `
+    --name $registryName `
+    --sku Basic `
+    --admin-enabled true `
+    --query "loginServer" -o tsv
+
+if (-not $acrResult) {
+    Exit-WithError "Failed to create container registry"
+}
+
+Write-Success "Container Registry created: $registryName"
+Write-Info "Login server: $acrResult"
+
+# =======================
+# STEP 8: Push Image to Registry
+# =======================
+Write-Header "Step 8: Pushing Docker Image to Registry"
+
+Write-Info "Logging in to container registry..."
+az acr login --name $registryName
+
+if ($LASTEXITCODE -ne 0) {
+    Exit-WithError "Failed to log in to container registry"
+}
+
+Write-Success "Logged in to registry"
+
+$imageName = "$acrResult/tdx-mcp:latest"
+
+Write-Info "Tagging image: $imageName..."
+docker tag tdx-mcp:latest $imageName
+
+Write-Info "Pushing image to registry (this may take 2-3 minutes)..."
+docker push $imageName
+
+if ($LASTEXITCODE -ne 0) {
+    Exit-WithError "Failed to push Docker image"
+}
+
+Write-Success "Image pushed to registry: $imageName"
+
+# Get registry credentials for Bicep deployment
+Write-Info "Retrieving registry credentials..."
+$registryPassword = az acr credential show --resource-group $resourceGroupName --name $registryName --query passwords[0].value -o tsv
+$registryUsername = az acr credential show --resource-group $resourceGroupName --name $registryName --query username -o tsv
+
+if (-not $registryPassword -or -not $registryUsername) {
+    Exit-WithError "Failed to retrieve registry credentials"
+}
+
+Write-Success "Registry credentials retrieved"
 
 Write-Info "Validating Bicep template..."
 $bicepValidation = az deployment group validate `
@@ -256,6 +354,8 @@ $bicepValidation = az deployment group validate `
     --parameters infra/main.parameters.json `
     --parameters location=$Location `
     --parameters containerImage=$imageName `
+    --parameters registryUsername=$registryUsername `
+    --parameters registryPassword=$registryPassword `
     --parameters tdxApiKey=$($envVars['TDX_WEB_SERVICES_KEY']) `
     --parameters tdxApiUrl=$($envVars['TDX_BASE_URL']) `
     2>&1
@@ -275,6 +375,8 @@ $deploymentResult = az deployment group create `
     --parameters infra/main.parameters.json `
     --parameters location=$Location `
     --parameters containerImage=$imageName `
+    --parameters registryUsername=$registryUsername `
+    --parameters registryPassword=$registryPassword `
     --parameters tdxApiKey=$($envVars['TDX_WEB_SERVICES_KEY']) `
     --parameters tdxApiUrl=$($envVars['TDX_BASE_URL']) `
     --query "properties.outputs" 2>&1
@@ -288,7 +390,7 @@ if ($LASTEXITCODE -ne 0) {
 Write-Success "Bicep deployment completed"
 
 # =======================
-# STEP 10: Display Results
+# STEP 11: Display Results
 # =======================
 Write-Header "🎉 Deployment Complete!"
 

@@ -9,10 +9,13 @@ param apiKey string = newGuid()
 param tdxApiKey string
 @secure()
 param tdxApiUrl string
+@secure()
+param registryUsername string = ''
+@secure()
+param registryPassword string = ''
 
 // Generate unique suffix for resource names
 var uniqueSuffix = substring(uniqueString(resourceGroup().id), 0, 6)
-var containerRegistryName = 'cr${environment}${uniqueSuffix}'
 var containerAppEnvironmentName = 'cae-${environment}-${uniqueSuffix}'
 var containerAppName = 'tdx-mcp-${environment}-${uniqueSuffix}'
 var logAnalyticsName = 'la-${environment}-${uniqueSuffix}'
@@ -63,10 +66,25 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
       dapr: {
         enabled: false
       }
+      registries: [
+        {
+          server: substring(containerImage, 0, indexOf(containerImage, '/'))
+          username: registryUsername
+          passwordSecretRef: 'registry-password'
+        }
+      ]
       secrets: [
         {
           name: 'api-key'
           value: apiKey
+        }
+        {
+          name: 'registry-username'
+          value: registryUsername
+        }
+        {
+          name: 'registry-password'
+          value: registryPassword
         }
         {
           name: 'tdx-api-key'
@@ -84,7 +102,7 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
           name: 'tdx-mcp-server'
           image: containerImage != '' ? containerImage : 'mcr.microsoft.com/azuredocs/containerapp-hello:latest'
           resources: {
-            cpu: '0.5'
+            cpu: json('0.5')
             memory: '1Gi'
           }
           env: [

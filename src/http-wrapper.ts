@@ -123,22 +123,22 @@ function transformMCPResponse(mcpResponse, requestMessage) {
 
 class MCPServerPool {
   availableProcesses: any[] = [];
-  warmingProcesses: Promise<void>[] = [];
-  maxProcesses: number = 5;
-  minWarmProcesses: number = 2;
+  warmingProcesses: Set<Promise<any>> = new Set();
+  maxProcesses: number = 3;
+  minWarmProcesses: number = 1;
+  processTimeout: number = 15000; // 15s timeout for process operations
 
   constructor() {
-    this.availableProcesses = [];
-    this.warmingProcesses = [];
-    this.maxProcesses = 5;
-    this.minWarmProcesses = 2;
+    console.log('[MCP Pool] Initializing with max=' + this.maxProcesses + ', min-warm=' + this.minWarmProcesses);
   }
 
-  async spawnProcess() {
+  async spawnProcess(): Promise<any> {
     return new Promise((resolve) => {
       console.log(`[MCP Pool] Spawning new MCP process`);
+      
       const proc = spawn('node', [MCPscriptPath], {
         stdio: ['pipe', 'pipe', 'pipe'],
+        timeout: this.processTimeout,
         env: {
           ...process.env,
           NODE_ENV: 'production',
@@ -151,77 +151,79 @@ class MCPServerPool {
         }
       });
 
-      let readyReceived = false;
+      // Mark process with metadata
+      (proc as any).createdAt = Date.now();
+      (proc as any).isHealthy = false;
+      (proc as any).requestCount = 0;
 
-      proc.on('error', (err) => {
-        console.error('[MCP Pool] Process error:', err);
-        resolve(null);
-      });
-
-      // Wait for the specific "[MCP Server Ready]" message indicating process is fully initialized
-      const onData = (data: Buffer) => {
-        const dataStr = data.toString().trim();
-        console.log(`[MCP Pool] Received data from child: "${dataStr}"`);
-        if (!readyReceived && data.toString().includes('[MCP Server Ready]')) {
-          readyReceived = true;
-          proc.stdout.removeListener('data', onData);
-          console.log(`[MCP Pool] Process ready (PID: ${proc.pid})`);
-          resolve(proc);
+      // Aggressive error handling
+      const errorHandler = (err: Error) => {
+        console.error(`[MCP Pool] Process error (PID ${proc.pid}):`, err.message);
+        (proc as any).isHealthy = false;
+        if (!proc.killed) {
+          proc.kill('SIGKILL');
         }
       };
 
-      // Set timeout - if process doesn't respond within 30 seconds, return anyway
-      const timeout = setTimeout(() => {
-        if (!readyReceived) {
-          readyReceived = true;
-          proc.stdout.removeListener('data', onData);
-          console.log(`[MCP Pool] Process timeout (PID: ${proc.pid}), using anyway`);
-          resolve(proc);
-        }
-      }, 30000);
+      const closeHandler = (code: number) => {
+        console.error(`[MCP Pool] Process closed (PID ${proc.pid}) with code ${code}`);
+        (proc as any).isHealthy = false;
+      };
 
-      proc.stdout.on('data', onData);
+      proc.on('error', errorHandler);
+      proc.on('close', closeHandler);
+      proc.on('exit', closeHandler);
+
+      // Don't wait for ready message - assume process is ready immediately
+      // We'll validate on first use
+      (proc as any).isHealthy = true;
+      console.log(`[MCP Pool] Process spawned (PID: ${proc.pid}), ready for use`);
+      resolve(proc);
     });
   }
 
   async warmup() {
+    const totalWarming = this.availableProcesses.length + this.warmingProcesses.size;
+    
     while (this.availableProcesses.length < this.minWarmProcesses && 
-           this.warmingProcesses.length + this.availableProcesses.length < this.maxProcesses) {
-      const warmupPromise = (async () => {
-        const proc = await this.spawnProcess();
-        if (proc && !proc.killed) {
+           totalWarming < this.maxProcesses) {
+      const warmupPromise = this.spawnProcess().then(proc => {
+        if (proc && !proc.killed && (proc as any).isHealthy) {
           this.availableProcesses.push(proc);
+          console.log(`[MCP Pool] Warm process ready (PID: ${proc.pid}), available=${this.availableProcesses.length}`);
         }
-        this.warmingProcesses = this.warmingProcesses.filter(p => p !== warmupPromise);
-      })();
-      this.warmingProcesses.push(warmupPromise);
+        this.warmingProcesses.delete(warmupPromise);
+      }).catch(err => {
+        console.error('[MCP Pool] Warmup failed:', err.message);
+        this.warmingProcesses.delete(warmupPromise);
+      });
+      
+      this.warmingProcesses.add(warmupPromise);
     }
   }
 
-  getProcess() {
-    // Return existing warm process if available
-    if (this.availableProcesses.length > 0) {
-      const proc = this.availableProcesses.pop();
-      console.log(`[MCP Pool] Using warm process (PID: ${proc.pid}), remaining: ${this.availableProcesses.length}`);
-      return proc;
+  getProcess(): any {
+    // Return healthy warm process if available
+    while (this.availableProcesses.length > 0) {
+      const proc = this.availableProcesses.shift();
+      
+      if (proc && !proc.killed && (proc as any).isHealthy) {
+        console.log(`[MCP Pool] Using warm process (PID: ${proc.pid}), available=${this.availableProcesses.length}`);
+        (proc as any).requestCount++;
+        return proc;
+      } else {
+        console.log(`[MCP Pool] Discarding dead/unhealthy process`);
+        if (proc && !proc.killed) {
+          proc.kill('SIGKILL');
+        }
+      }
     }
 
-    // If no warm process and we can spawn more, do it now (blocking wait for warmup)
-    if (this.availableProcesses.length + this.warmingProcesses.length < this.maxProcesses) {
-      console.log(`[MCP Pool] No warm process, spawning new one (available: ${this.availableProcesses.length}, warming: ${this.warmingProcesses.length})`);
-      // Spawn and wait for it to be ready - user will wait
-      return this.spawnProcessSync();
-    }
-
-    // Worst case: wait for a warming process to complete
-    console.log(`[MCP Pool] WARNING: All processes busy (${this.maxProcesses}), reusing busy process`);
-    return this.spawnProcessSync();
-  }
-
-  spawnProcessSync() {
-    // Synchronous spawn - returns immediately, process initializes in background
-    const proc = spawn('node', [MCPscriptPath], {
+    // Spawn a new process immediately (don't wait)
+    console.log(`[MCP Pool] No warm processes available, spawning new one`);
+    const newProc = spawn('node', [MCPscriptPath], {
       stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: this.processTimeout,
       env: {
         ...process.env,
         NODE_ENV: 'production',
@@ -234,40 +236,74 @@ class MCPServerPool {
       }
     });
 
-    proc.on('error', (err) => {
-      console.error('[MCP Pool] Process error (PID: ' + proc.pid + '):', err);
+    (newProc as any).createdAt = Date.now();
+    (newProc as any).isHealthy = true;
+    (newProc as any).requestCount = 0;
+
+    newProc.on('error', (err) => {
+      console.error(`[MCP Pool] Process error (PID ${newProc.pid}):`, err.message);
+      (newProc as any).isHealthy = false;
     });
 
-    return proc;
+    // Continue warming up in background
+    this.warmup();
+    
+    return newProc;
   }
 
-  releaseProcess(proc) {
-    if (proc && !proc.killed && this.availableProcesses.length < this.maxProcesses) {
-      // Reset process for reuse
-      this.availableProcesses.push(proc);
-      // Start warming more processes if needed
-      this.warmup();
-    } else if (proc && !proc.killed) {
-      proc.kill();
+  releaseProcess(proc: any) {
+    if (!proc) return;
+    
+    // Mark unhealthy processes for disposal
+    if (proc.killed || !(proc as any).isHealthy) {
+      console.log(`[MCP Pool] Releasing dead process (PID: ${proc.pid})`);
+      return;
     }
+
+    // Recycle old processes after many requests
+    const age = Date.now() - (proc as any).createdAt;
+    if (age > 300000 || (proc as any).requestCount > 100) { // 5 min or 100 requests
+      console.log(`[MCP Pool] Recycling old process (PID: ${proc.pid}, age=${age}ms, requests=${(proc as any).requestCount})`);
+      if (!proc.killed) {
+        proc.kill('SIGTERM');
+      }
+      return;
+    }
+
+    // Return healthy process to pool
+    if (this.availableProcesses.length < this.maxProcesses) {
+      this.availableProcesses.push(proc);
+      console.log(`[MCP Pool] Returned process to pool (PID: ${proc.pid}), available=${this.availableProcesses.length}`);
+    } else {
+      console.log(`[MCP Pool] Pool full, discarding process (PID: ${proc.pid})`);
+      if (!proc.killed) {
+        proc.kill('SIGTERM');
+      }
+    }
+
+    // Maintain warmup
+    this.warmup();
   }
 
   cleanup() {
+    console.log('[MCP Pool] Cleaning up...');
     this.availableProcesses.forEach(proc => {
       if (proc && !proc.killed) {
-        proc.kill();
+        proc.kill('SIGKILL');
       }
     });
     this.availableProcesses = [];
-    this.warmingProcesses = [];
+    this.warmingProcesses.clear();
   }
 
   async initialize() {
-    console.log('[MCP Pool] Initializing process pool...');
+    console.log('[MCP Pool] Initializing...');
     await this.warmup();
-    // Wait for initial warm-up to complete
-    await Promise.allSettled(this.warmingProcesses);
-    console.log(`[MCP Pool] Pool initialized with ${this.availableProcesses.length} ready processes`);
+    await Promise.race([
+      Promise.all(Array.from(this.warmingProcesses)),
+      new Promise(resolve => setTimeout(resolve, 5000)) // Max 5s wait
+    ]);
+    console.log(`[MCP Pool] Ready with ${this.availableProcesses.length} warm processes`);
   }
 }
 
@@ -387,16 +423,37 @@ class MCPSession {
   sendRequest(message) {
     console.log(`[MCP Session] Sending request to ${this.sessionId}:`, JSON.stringify(message).substring(0, 100));
     this.lastRequest = message; // Store for use in transformation
-    if (!this.mcp || this.mcp.killed) {
-      console.log(`[MCP Session] Initializing new MCP process for ${this.sessionId}`);
+    
+    // Validate process is alive
+    if (!this.mcp || this.mcp.killed || (this.mcp as any).isHealthy === false) {
+      console.error(`[MCP Session] Process is dead/unhealthy for ${this.sessionId}, reinitializing...`);
+      // Mark as dead if it exists
+      if (this.mcp && !(this.mcp as any).isHealthy) {
+        console.error(`[MCP Session] Marking process unhealthy before reinit`);
+        (this.mcp as any).isHealthy = false;
+      }
       this.initialize();
     }
+    
+    if (!this.mcp || this.mcp.killed) {
+      console.error(`[MCP Session] Still no valid process after reinit!`);
+      return;
+    }
+    
     try {
       const msgStr = JSON.stringify(message) + '\n';
       console.log(`[MCP Session] Writing to stdin: ${msgStr.substring(0, 100)}`);
-      this.mcp.stdin.write(msgStr);
+      this.mcp.stdin.write(msgStr, (err: Error | null) => {
+        if (err) {
+          console.error(`[MCP Session] Write error: ${err.message}`);
+          (this.mcp as any).isHealthy = false;
+        }
+      });
     } catch (err) {
-      console.error('[MCP Session] Write error:', err);
+      console.error('[MCP Session] Write exception:', err);
+      if (this.mcp) {
+        (this.mcp as any).isHealthy = false;
+      }
     }
   }
 
@@ -702,6 +759,7 @@ function handleMCPHTTPRequest(req, res) {
       // Set up response collection for this specific request
       let responseReceived = false;
       let responseData = null;
+      let requestProcessed = false;
       
       const responseHandler = (msgToCheck) => {
         // Check if this is the response to our request
@@ -722,10 +780,20 @@ function handleMCPHTTPRequest(req, res) {
       
       // Set a timeout to wait for response (30 seconds)
       const timeout = setTimeout(() => {
-        if (!responseReceived) {
+        if (!responseReceived && !requestProcessed) {
+          requestProcessed = true;
           console.error(`[MCP HTTP] Timeout waiting for response to request id ${message.id}`);
           // Remove handler
           session.responseHandlers = session.responseHandlers.filter(h => h !== responseHandler);
+          
+          // Mark process as unhealthy if we timeout
+          if (session.mcp) {
+            console.error(`[MCP HTTP] Marking process unhealthy due to timeout`);
+            (session.mcp as any).isHealthy = false;
+            // Release the dead process
+            mcpPool.releaseProcess(session.mcp);
+            session.mcp = null;
+          }
           
           if (!res.headersSent) {
             res.writeHead(504, { 'Content-Type': 'application/json' });
@@ -736,12 +804,19 @@ function handleMCPHTTPRequest(req, res) {
       
       // Poll for response
       const pollInterval = setInterval(() => {
-        if (responseReceived) {
+        if (responseReceived && !requestProcessed) {
+          requestProcessed = true;
           clearInterval(pollInterval);
           clearTimeout(timeout);
           
           // Remove handler
           session.responseHandlers = session.responseHandlers.filter(h => h !== responseHandler);
+          
+          // Release process back to pool after successful request
+          if (session.mcp && !session.mcp.killed && (session.mcp as any).isHealthy) {
+            mcpPool.releaseProcess(session.mcp);
+            console.log(`[MCP HTTP] Released process back to pool after successful request`);
+          }
           
           if (!res.headersSent) {
             console.log(`[MCP HTTP] Returning response to request id ${message.id}`);
