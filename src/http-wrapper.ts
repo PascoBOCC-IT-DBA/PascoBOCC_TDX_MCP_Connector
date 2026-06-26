@@ -23,11 +23,14 @@ const __dirname = dirname(__filename);
 const PORT = process.env.MCP_HTTP_PORT || 3000;
 const API_KEY = process.env.MCP_API_KEY || null;
 const MCPscriptPath = join(__dirname, '..', 'dist', 'index.js');
+// Timeout for MCP tool calls in milliseconds (default 60 seconds for remote API calls)
+const REQUEST_TIMEOUT_MS = parseInt(process.env.MCP_REQUEST_TIMEOUT_MS || '60000', 10);
 
 console.log(`[Startup] HTTP Wrapper initializing...`);
 console.log(`[Startup] PORT: ${PORT}`);
 console.log(`[Startup] API_KEY: ${API_KEY ? 'configured' : 'not configured'}`);
 console.log(`[Startup] MCP Script: ${MCPscriptPath}`);
+console.log(`[Startup] Request Timeout: ${REQUEST_TIMEOUT_MS}ms`);
 
 /**
  * Transform MCP responses into agent-friendly format
@@ -84,13 +87,28 @@ function transformMCPResponse(mcpResponse, requestMessage) {
 
 // Single persistent MCP process
 let globalMcpProcess: any = null;
+let mcpRestartCount = 0;
+const MAX_RESTART_ATTEMPTS = 5;
+const RESTART_DELAY = 2000; // 2 seconds
 
 function getOrCreateMCPProcess() {
   if (globalMcpProcess && !globalMcpProcess.killed) {
     return globalMcpProcess;
   }
 
-  console.log('[MCP] Spawning new persistent MCP process...');
+  console.log(`[MCP] Spawning new persistent MCP process... (restart count: ${mcpRestartCount})`);
+  
+  if (mcpRestartCount >= MAX_RESTART_ATTEMPTS) {
+    console.error(`[MCP] ❌ FATAL: Max restart attempts (${MAX_RESTART_ATTEMPTS}) exceeded. MCP process is crashing repeatedly.`);
+    console.error('[MCP] Check:');
+    console.error('  1. TDX_BASE_URL, TDX_BEID, TDX_WEB_SERVICES_KEY are set correctly');
+    console.error('  2. TDX API is accessible from this container');
+    console.error('  3. TDX credentials are valid and have required permissions');
+    console.error('  4. Network connectivity to TDX instance');
+    globalMcpProcess = null;
+    return null;
+  }
+  
   const proc = spawn('node', [MCPscriptPath], {
     stdio: ['pipe', 'pipe', 'pipe'],
     env: {
@@ -107,12 +125,35 @@ function getOrCreateMCPProcess() {
 
   proc.on('error', (err) => {
     console.error(`[MCP] Process error: ${err.message}`);
+    mcpRestartCount++;
     globalMcpProcess = null;
+    console.log(`[MCP] Will attempt to restart in ${RESTART_DELAY}ms...`);
+    setTimeout(() => {
+      if (!globalMcpProcess) {
+        getOrCreateMCPProcess();
+      }
+    }, RESTART_DELAY);
   });
 
   proc.on('close', (code) => {
-    console.error(`[MCP] Process closed with code ${code}`);
-    globalMcpProcess = null;
+    console.error(`[MCP] ❌ Process closed with exit code ${code}`);
+    if (code !== 0) {
+      mcpRestartCount++;
+      globalMcpProcess = null;
+      console.log(`[MCP] Restart count: ${mcpRestartCount}/${MAX_RESTART_ATTEMPTS}`);
+      if (mcpRestartCount < MAX_RESTART_ATTEMPTS) {
+        console.log(`[MCP] Will attempt to restart in ${RESTART_DELAY}ms...`);
+        setTimeout(() => {
+          if (!globalMcpProcess) {
+            getOrCreateMCPProcess();
+          }
+        }, RESTART_DELAY);
+      }
+    } else {
+      console.log('[MCP] Process exited cleanly (code 0)');
+      mcpRestartCount = 0;
+      globalMcpProcess = null;
+    }
   });
 
   // Capture stderr for diagnostics
@@ -203,14 +244,14 @@ function handleMcpRequest(message, res) {
   const requestId = message.id || Math.random();
   const timeout = setTimeout(() => {
     if (pendingRequests.has(requestId)) {
-      console.error(`[Handler] Request ${requestId} timeout after 30s`);
+      console.error(`[Handler] Request ${requestId} timeout after ${REQUEST_TIMEOUT_MS}ms`);
       pendingRequests.delete(requestId);
       if (!res.headersSent) {
         res.writeHead(504, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Request timeout (30s)' }));
+        res.end(JSON.stringify({ error: `Request timeout (${REQUEST_TIMEOUT_MS / 1000}s)` }));
       }
     }
-  }, 30000);
+  }, REQUEST_TIMEOUT_MS);
 
   const promise = new Promise((resolve, reject) => {
     pendingRequests.set(requestId, { resolve, reject, timeout });
@@ -389,7 +430,35 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`[Startup] ✓ MCP HTTP Wrapper listening on port ${PORT}`);
   console.log(`[Startup] ✓ Endpoints: POST /mcp, GET /health, GET /tools, GET /status`);
   console.log(`[Startup] ✓ API Key: ${API_KEY ? 'REQUIRED' : 'NOT REQUIRED'}`);
+  console.log('[Startup] ✓ Environment variables verified');
+  console.log('[Startup] ✓ Spawning MCP subprocess...');
+  // Pre-spawn MCP process to catch startup errors early
+  getOrCreateMCPProcess();
 });
+
+// Global error handlers to prevent silent crashes
+process.on('uncaughtException', (err) => {
+  console.error('[ERROR] Uncaught Exception:', err);
+  console.error('[ERROR] Stack:', err.stack);
+  console.error('[ERROR] Process will restart in 2 seconds...');
+  setTimeout(() => {
+    process.exit(1);
+  }, 2000);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[ERROR] Unhandled Rejection at:', promise);
+  console.error('[ERROR] Reason:', reason);
+  console.error('[ERROR] Process will restart in 2 seconds...');
+  setTimeout(() => {
+    process.exit(1);
+  }, 2000);
+});
+
+// Log startup info
+console.log(`[Startup] Node.js version: ${process.version}`);
+console.log(`[Startup] Environment: ${process.env.NODE_ENV || 'development'}`);
+console.log(`[Startup] PID: ${process.pid}`);
 
 process.on('SIGTERM', () => {
   console.log('[Shutdown] SIGTERM received, cleaning up...');

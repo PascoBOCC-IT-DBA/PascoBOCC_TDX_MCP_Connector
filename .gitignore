@@ -27,6 +27,7 @@ npm-debug.log*
 tdx-mcp.service
 .mcpserver
 .azure/
+deploy/
 
 # Test & Query Scripts
 /tests
