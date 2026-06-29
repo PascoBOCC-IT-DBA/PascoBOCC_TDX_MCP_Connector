@@ -24,6 +24,7 @@ const __dirname = dirname(__filename);
 
 const PORT = process.env.MCP_HTTP_PORT || 3000;
 const API_KEY = process.env.MCP_API_KEY || null;
+const ALLOW_UNAUTH_INITIALIZE = process.env.MCP_ALLOW_UNAUTH_INITIALIZE === 'true';
 const MCPscriptPath = join(__dirname, '..', 'dist', 'index.js');
 // Global fallback timeout for MCP requests in milliseconds
 const REQUEST_TIMEOUT_MS = parseInt(process.env.MCP_REQUEST_TIMEOUT_MS || '60000', 10);
@@ -35,6 +36,7 @@ const TOOLS_CALL_TIMEOUT_MS = parseInt(process.env.MCP_TOOLS_CALL_TIMEOUT_MS || 
 console.log(`[Startup] HTTP Wrapper initializing...`);
 console.log(`[Startup] PORT: ${PORT}`);
 console.log(`[Startup] API_KEY: ${API_KEY ? 'configured' : 'not configured'}`);
+console.log(`[Startup] Allow Unauthenticated Initialize: ${ALLOW_UNAUTH_INITIALIZE ? 'enabled' : 'disabled'}`);
 console.log(`[Startup] MCP Script: ${MCPscriptPath}`);
 console.log(`[Startup] Request Timeout (default): ${REQUEST_TIMEOUT_MS}ms`);
 console.log(`[Startup] Request Timeout (initialize): ${INIT_TIMEOUT_MS}ms`);
@@ -57,6 +59,57 @@ function getRequestTimeoutMs(message: any): number {
   }
 
   return REQUEST_TIMEOUT_MS;
+}
+
+function getProvidedApiKey(req: http.IncomingMessage): string {
+  const authHeaderRaw = req.headers.authorization;
+  const authHeader = Array.isArray(authHeaderRaw) ? authHeaderRaw[0] : authHeaderRaw || '';
+
+  if (authHeader) {
+    if (authHeader.toLowerCase().startsWith('bearer ')) {
+      return authHeader.slice(7).trim();
+    }
+    return authHeader.trim();
+  }
+
+  const candidateHeaders = ['x-api-key', 'api-key', 'x-functions-key'];
+  for (const headerName of candidateHeaders) {
+    const headerRaw = req.headers[headerName];
+    const headerValue = Array.isArray(headerRaw) ? headerRaw[0] : headerRaw;
+    if (typeof headerValue === 'string' && headerValue.trim()) {
+      return headerValue.trim();
+    }
+  }
+
+  return '';
+}
+
+function isNotificationMessage(message: any): boolean {
+  if (!message || typeof message !== 'object' || Array.isArray(message)) {
+    return false;
+  }
+
+  const hasMessageId = Object.prototype.hasOwnProperty.call(message, 'id');
+  const methodName = typeof message.method === 'string' ? message.method : '';
+
+  return !hasMessageId || methodName.startsWith('notifications/');
+}
+
+function isAllowedWithoutAuthInCompatibilityMode(message: any): boolean {
+  if (!ALLOW_UNAUTH_INITIALIZE) {
+    return false;
+  }
+
+  if (Array.isArray(message)) {
+    return message.length > 0 && message.every((entry) => isNotificationMessage(entry));
+  }
+
+  const methodName = typeof message?.method === 'string' ? message.method : '';
+  if (methodName === 'initialize') {
+    return true;
+  }
+
+  return isNotificationMessage(message);
 }
 
 /**
@@ -352,11 +405,11 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // API Key authentication
-  if (API_KEY && req.url !== '/health' && req.url !== '/tools' && req.url !== '/status') {
-    const authHeader = req.headers.authorization || '';
-    const providedKey = authHeader.replace('Bearer ', '').trim();
-    
+  const isPublicEndpoint = req.url === '/health' || req.url === '/tools' || req.url === '/status';
+
+  // API Key authentication for non-MCP routes
+  if (API_KEY && !isPublicEndpoint && req.url !== '/' && req.url !== '/mcp' && req.url !== '/mcp/') {
+    const providedKey = getProvidedApiKey(req);
     if (!providedKey || providedKey !== API_KEY) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Unauthorized' }));
@@ -452,6 +505,21 @@ const server = http.createServer((req, res) => {
       console.log(`[HTTP] Request complete, body length: ${body.length}`);
       try {
         const message = JSON.parse(body);
+
+        // API Key authentication for MCP endpoint with optional compatibility bypass
+        if (API_KEY) {
+          const providedKey = getProvidedApiKey(req);
+
+          if (!providedKey || providedKey !== API_KEY) {
+            if (!isAllowedWithoutAuthInCompatibilityMode(message)) {
+              res.writeHead(401, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'Unauthorized' }));
+              return;
+            }
+            console.warn('[Auth] Allowing unauthenticated MCP compatibility request due to MCP_ALLOW_UNAUTH_INITIALIZE=true');
+          }
+        }
+
         handleMcpRequest(message, res);
       } catch (err) {
         console.error(`[HTTP] JSON parse error: ${err}`);

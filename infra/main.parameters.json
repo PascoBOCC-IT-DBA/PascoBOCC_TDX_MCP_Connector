@@ -14,11 +14,23 @@
     "containerPort": {
       "value": 3000
     },
-    "tdxApiKey": {
-      "value": "${TDX_API_KEY}"
+    "tdxBaseUrl": {
+      "value": "https://service.pascocountyfl.net/TDWebApi/api"
     },
-    "tdxApiUrl": {
-      "value": "${TDX_API_URL}"
+    "tdxBeid": {
+      "value": "20AE9C5F-5CAE-4FDD-B530-117577ED5CA4"
+    },
+    "tdxWebServicesKey": {
+      "value": "${TDX_WEB_SERVICES_KEY}"
+    },
+    "tdxAppId": {
+      "value": "115"
+    },
+    "tdxAssetsAppId": {
+      "value": "116"
+    },
+    "tdxKbAppId": {
+      "value": "114"
     }
   }
 }

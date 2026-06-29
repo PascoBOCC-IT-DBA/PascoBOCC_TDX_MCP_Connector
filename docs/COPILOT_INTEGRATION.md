@@ -159,6 +159,25 @@ curl -H "Authorization: Bearer YOUR_API_KEY" \
 
 Your API key is generated during deployment and stored securely. See [AZURE_CONTAINER_APPS_DEPLOYMENT.md](AZURE_CONTAINER_APPS_DEPLOYMENT.md) for deployment details.
 
+The HTTP wrapper accepts API keys in these headers:
+- `Authorization: Bearer <API_KEY>` (preferred)
+- `Authorization: <API_KEY>`
+- `x-api-key: <API_KEY>`
+- `api-key: <API_KEY>`
+- `x-functions-key: <API_KEY>`
+
+### Copilot Studio: `initialize` returns 401 Unauthorized
+
+If your connector can list tools but fails on MCP `initialize` with `Unauthorized`, the connector is usually not forwarding auth to `POST /mcp`.
+
+Use this checklist:
+1. Confirm your connector operation calling `/mcp` sends one of the supported auth headers above.
+2. Verify the operation named `InvokeServer` is bound to the same authenticated connection as test calls.
+3. Validate with a direct call to `/mcp` including `{"method":"initialize"}` and your API key header.
+4. If the platform still strips auth for `initialize`, set `MCP_ALLOW_UNAUTH_INITIALIZE=true` as a compatibility workaround.
+
+Security note: `MCP_ALLOW_UNAUTH_INITIALIZE=true` only bypasses auth for the `initialize` method. Tool invocations still require valid API key authentication.
+
 ### Entra/Azure OAuth 2.0 (Alternative Configuration)
 
 If you need to implement Entra/Azure authentication instead of API key authentication, the MCP service can be secured with OAuth 2.0 / OpenID Connect (OIDC).

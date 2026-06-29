@@ -64,6 +64,7 @@ This design prevents accidental data changes when the server is first deployed. 
 |----------|----------|-------------|
 | `MCP_HTTP_PORT` | No | HTTP port for public deployment mode (e.g. `3000`). Only needed when running as an HTTP server. |
 | `MCP_API_KEY` | No | API key for public deployment authentication. Required when `MCP_HTTP_PORT` is set. |
+| `MCP_ALLOW_UNAUTH_INITIALIZE` | No | Set to `"true"` only when an MCP client cannot send auth on `initialize`. This allows unauthenticated `initialize` requests, while tool calls still require valid API key. Default is `"false"`. |
 | `NODE_ENV` | No | Node environment (`development` or `production`). Default is `production`. |
 | `ALLOW_MODIFICATIONS` | No | Enable/disable modification tools. Set to `"true"` to enable 22 modification tools (create, update, delete). Default is `"false"` (safe mode - only 21 always-available tools accessible) |
 

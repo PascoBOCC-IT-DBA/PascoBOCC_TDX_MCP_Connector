@@ -28,6 +28,8 @@ tdx-mcp.service
 .mcpserver
 .azure/
 deploy/
+infra/
+docker/
 
 # Test & Query Scripts
 /tests

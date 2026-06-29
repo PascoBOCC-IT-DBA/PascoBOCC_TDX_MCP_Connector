@@ -6,9 +6,14 @@ param containerImage string = ''
 param containerPort int = 3000
 param apiKey string = newGuid()
 @secure()
-param tdxApiKey string
+param tdxBaseUrl string
 @secure()
-param tdxApiUrl string
+param tdxBeid string
+@secure()
+param tdxWebServicesKey string
+param tdxAppId string = '115'
+param tdxAssetsAppId string = '116'
+param tdxKbAppId string = '114'
 @secure()
 param registryUsername string = ''
 @secure()
@@ -66,18 +71,31 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
       dapr: {
         enabled: false
       }
-      registries: [
+      registries: registryUsername != '' ? [
         {
           server: substring(containerImage, 0, indexOf(containerImage, '/'))
           username: registryUsername
           passwordSecretRef: 'registry-password'
         }
-      ]
-      secrets: [
+      ] : []
+      secrets: concat([
         {
           name: 'api-key'
           value: apiKey
         }
+        {
+          name: 'tdx-base-url'
+          value: tdxBaseUrl
+        }
+        {
+          name: 'tdx-beid'
+          value: tdxBeid
+        }
+        {
+          name: 'tdx-web-services-key'
+          value: tdxWebServicesKey
+        }
+      ], registryUsername != '' ? [
         {
           name: 'registry-username'
           value: registryUsername
@@ -86,15 +104,7 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
           name: 'registry-password'
           value: registryPassword
         }
-        {
-          name: 'tdx-api-key'
-          value: tdxApiKey
-        }
-        {
-          name: 'tdx-api-url'
-          value: tdxApiUrl
-        }
-      ]
+      ] : [])
     }
     template: {
       containers: [
@@ -107,24 +117,44 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
           }
           env: [
             {
-              name: 'PORT'
-              value: string(containerPort)
+              name: 'NODE_ENV'
+              value: environment
             }
             {
-              name: 'API_KEY'
+              name: 'MCP_API_KEY'
               secretRef: 'api-key'
             }
             {
-              name: 'TDX_API_KEY'
-              secretRef: 'tdx-api-key'
+              name: 'TDX_BASE_URL'
+              secretRef: 'tdx-base-url'
             }
             {
-              name: 'TDX_API_URL'
-              secretRef: 'tdx-api-url'
+              name: 'TDX_BEID'
+              secretRef: 'tdx-beid'
             }
             {
-              name: 'NODE_ENV'
-              value: environment
+              name: 'TDX_WEB_SERVICES_KEY'
+              secretRef: 'tdx-web-services-key'
+            }
+            {
+              name: 'TDX_APP_ID'
+              value: tdxAppId
+            }
+            {
+              name: 'TDX_ASSETS_APP_ID'
+              value: tdxAssetsAppId
+            }
+            {
+              name: 'TDX_KB_APP_ID'
+              value: tdxKbAppId
+            }
+            {
+              name: 'MCP_HTTP_PORT'
+              value: string(containerPort)
+            }
+            {
+              name: 'ALLOW_MODIFICATIONS'
+              value: 'false'
             }
           ]
         }
