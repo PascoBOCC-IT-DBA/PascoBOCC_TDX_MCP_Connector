@@ -14,6 +14,8 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import dotenv from 'dotenv';
 
+type JsonRpcId = string | number;
+
 // Load environment variables from .env file
 dotenv.config();
 
@@ -23,14 +25,39 @@ const __dirname = dirname(__filename);
 const PORT = process.env.MCP_HTTP_PORT || 3000;
 const API_KEY = process.env.MCP_API_KEY || null;
 const MCPscriptPath = join(__dirname, '..', 'dist', 'index.js');
-// Timeout for MCP tool calls in milliseconds (default 60 seconds for remote API calls)
+// Global fallback timeout for MCP requests in milliseconds
 const REQUEST_TIMEOUT_MS = parseInt(process.env.MCP_REQUEST_TIMEOUT_MS || '60000', 10);
+// Method-specific timeout overrides (milliseconds)
+const INIT_TIMEOUT_MS = parseInt(process.env.MCP_INIT_TIMEOUT_MS || '30000', 10);
+const TOOLS_LIST_TIMEOUT_MS = parseInt(process.env.MCP_TOOLS_LIST_TIMEOUT_MS || '30000', 10);
+const TOOLS_CALL_TIMEOUT_MS = parseInt(process.env.MCP_TOOLS_CALL_TIMEOUT_MS || '180000', 10);
 
 console.log(`[Startup] HTTP Wrapper initializing...`);
 console.log(`[Startup] PORT: ${PORT}`);
 console.log(`[Startup] API_KEY: ${API_KEY ? 'configured' : 'not configured'}`);
 console.log(`[Startup] MCP Script: ${MCPscriptPath}`);
-console.log(`[Startup] Request Timeout: ${REQUEST_TIMEOUT_MS}ms`);
+console.log(`[Startup] Request Timeout (default): ${REQUEST_TIMEOUT_MS}ms`);
+console.log(`[Startup] Request Timeout (initialize): ${INIT_TIMEOUT_MS}ms`);
+console.log(`[Startup] Request Timeout (tools/list): ${TOOLS_LIST_TIMEOUT_MS}ms`);
+console.log(`[Startup] Request Timeout (tools/call): ${TOOLS_CALL_TIMEOUT_MS}ms`);
+
+function getRequestTimeoutMs(message: any): number {
+  const methodName = message?.method;
+
+  if (methodName === 'initialize') {
+    return INIT_TIMEOUT_MS;
+  }
+
+  if (methodName === 'tools/list') {
+    return TOOLS_LIST_TIMEOUT_MS;
+  }
+
+  if (methodName === 'tools/call' || methodName === 'call_tool') {
+    return TOOLS_CALL_TIMEOUT_MS;
+  }
+
+  return REQUEST_TIMEOUT_MS;
+}
 
 /**
  * Transform MCP responses into agent-friendly format
@@ -167,7 +194,7 @@ function getOrCreateMCPProcess() {
 }
 
 // Pending requests map
-const pendingRequests = new Map<number, {
+const pendingRequests = new Map<JsonRpcId, {
   resolve: (data: any) => void;
   reject: (err: Error) => void;
   timeout: NodeJS.Timeout;
@@ -208,7 +235,7 @@ function ensureStdoutListener() {
           const msg = JSON.parse(line);
           console.log(`[MCP] Received JSON-RPC response with id: ${msg.id}`);
           
-          if (msg.id && pendingRequests.has(msg.id)) {
+          if (Object.prototype.hasOwnProperty.call(msg, 'id') && pendingRequests.has(msg.id)) {
             const req = pendingRequests.get(msg.id)!;
             pendingRequests.delete(msg.id);
             clearTimeout(req.timeout);
@@ -229,8 +256,10 @@ function ensureStdoutListener() {
 
 // Handle MCP JSON-RPC requests
 function handleMcpRequest(message, res) {
-  const isNotification = !message.id; // Notifications don't have an ID in JSON-RPC 2.0
+  const hasMessageId = Object.prototype.hasOwnProperty.call(message, 'id');
+  const isNotification = !hasMessageId; // Notifications don't have an ID in JSON-RPC 2.0
   const methodName = message.method || 'unknown';
+  const timeoutMs = getRequestTimeoutMs(message);
   
   console.log(`[Handler] Processing ${isNotification ? 'NOTIFICATION' : 'REQUEST'} - method: ${methodName}, id: ${message.id}`);
   
@@ -253,17 +282,17 @@ function handleMcpRequest(message, res) {
     return;
   }
 
-  const requestId = message.id || Math.random();
+  const requestId: JsonRpcId = message.id;
   const timeout = setTimeout(() => {
     if (pendingRequests.has(requestId)) {
-      console.error(`[Handler] Request ${requestId} timeout after ${REQUEST_TIMEOUT_MS}ms`);
+      console.error(`[Handler] Request ${requestId} timeout after ${timeoutMs}ms (method: ${methodName})`);
       pendingRequests.delete(requestId);
       if (!res.headersSent) {
         res.writeHead(504, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: `Request timeout (${REQUEST_TIMEOUT_MS / 1000}s)` }));
+        res.end(JSON.stringify({ error: `Request timeout (${timeoutMs / 1000}s)`, method: methodName }));
       }
     }
-  }, REQUEST_TIMEOUT_MS);
+  }, timeoutMs);
 
   const promise = new Promise((resolve, reject) => {
     pendingRequests.set(requestId, { resolve, reject, timeout });
@@ -285,7 +314,7 @@ function handleMcpRequest(message, res) {
   // Send the request
   try {
     const msgStr = JSON.stringify(message) + '\n';
-    console.log(`[Handler] Sending to MCP process (PID: ${proc.pid}): ${msgStr.substring(0, 100)}`);
+    console.log(`[Handler] Sending to MCP process (PID: ${proc.pid}, timeout: ${timeoutMs}ms): ${msgStr.substring(0, 100)}`);
     proc.stdin.write(msgStr, (err) => {
       if (err) {
         console.error(`[Handler] Write error: ${err.message}`);
