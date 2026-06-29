@@ -1,4 +1,4 @@
-metadata description = 'Azure Container Apps deployment for TDX MCP Connector with public access and API key authentication'
+metadata description = 'Azure Container Apps deployment for TDX MCP Connector with public access, API key authentication, and Key Vault integration for TDX credentials'
 
 param location string = resourceGroup().location
 param environment string = 'dev'
@@ -23,6 +23,7 @@ param registryPassword string = ''
 var uniqueSuffix = substring(uniqueString(resourceGroup().id), 0, 6)
 var containerAppEnvironmentName = 'cae-${environment}-${uniqueSuffix}'
 var containerAppName = 'tdx-mcp-${environment}-${uniqueSuffix}'
+var keyVaultName = 'kv-tdx-mcp-${uniqueSuffix}'
 var logAnalyticsName = 'la-${environment}-${uniqueSuffix}'
 
 // Log Analytics Workspace
@@ -34,6 +35,41 @@ resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2021-12
       name: 'PerGB2018'
     }
     retentionInDays: 30
+  }
+}
+
+// Key Vault for secure credential storage
+resource keyVault 'Microsoft.KeyVault/vaults@2023-02-01' = {
+  name: keyVaultName
+  location: location
+  properties: {
+    enabledForDeployment: true
+    enabledForTemplateDeployment: true
+    enabledForDiskEncryption: false
+    tenantId: subscription().tenantId
+    sku: {
+      family: 'A'
+      name: 'standard'
+    }
+    accessPolicies: []
+  }
+}
+
+// Key Vault Secret - TDX BEID
+resource tdxBeidSecret 'Microsoft.KeyVault/vaults/secrets@2023-02-01' = {
+  parent: keyVault
+  name: 'TdxBeid'
+  properties: {
+    value: tdxBeid
+  }
+}
+
+// Key Vault Secret - TDX Web Services Key
+resource tdxWebServicesKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-02-01' = {
+  parent: keyVault
+  name: 'TdxWebServicesKey'
+  properties: {
+    value: tdxWebServicesKey
   }
 }
 
@@ -52,7 +88,7 @@ resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2023-05-01' 
   }
 }
 
-// Container App with public ingress and authentication
+// Container App with Managed Identity
 resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
   name: containerAppName
   location: location
@@ -88,12 +124,14 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
           value: tdxBaseUrl
         }
         {
-          name: 'tdx-beid'
-          value: tdxBeid
+          name: 'kv-tdx-beid'
+          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/TdxBeid'
+          identity: 'System'
         }
         {
-          name: 'tdx-web-services-key'
-          value: tdxWebServicesKey
+          name: 'kv-tdx-web-services-key'
+          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/TdxWebServicesKey'
+          identity: 'System'
         }
       ], registryUsername != '' ? [
         {
@@ -130,11 +168,11 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
             }
             {
               name: 'TDX_BEID'
-              secretRef: 'tdx-beid'
+              secretRef: 'kv-tdx-beid'
             }
             {
               name: 'TDX_WEB_SERVICES_KEY'
-              secretRef: 'tdx-web-services-key'
+              secretRef: 'kv-tdx-web-services-key'
             }
             {
               name: 'TDX_APP_ID'
@@ -177,7 +215,29 @@ resource containerApp 'Microsoft.App/containerApps@2023-05-01' = {
   }
 }
 
+// Grant Container App Managed Identity access to Key Vault secrets
+resource keyVaultAccessPolicy 'Microsoft.KeyVault/vaults/accessPolicies@2023-02-01' = {
+  parent: keyVault
+  name: 'add'
+  properties: {
+    accessPolicies: [
+      {
+        tenantId: subscription().tenantId
+        objectId: containerApp.identity.principalId
+        permissions: {
+          secrets: [
+            'get'
+            'list'
+          ]
+        }
+      }
+    ]
+  }
+}
+
 output containerAppUrl string = 'https://${containerApp.properties.configuration.ingress.fqdn}'
 output containerAppName string = containerApp.name
+output keyVaultName string = keyVault.name
+output keyVaultUrl string = keyVault.properties.vaultUri
 output apiKey string = apiKey
 output containerAppId string = containerApp.id
