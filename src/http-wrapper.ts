@@ -229,7 +229,19 @@ function ensureStdoutListener() {
 
 // Handle MCP JSON-RPC requests
 function handleMcpRequest(message, res) {
-  console.log(`[Handler] Processing message ID: ${message.id}, method: ${message.method}`);
+  const isNotification = !message.id; // Notifications don't have an ID in JSON-RPC 2.0
+  const methodName = message.method || 'unknown';
+  
+  console.log(`[Handler] Processing ${isNotification ? 'NOTIFICATION' : 'REQUEST'} - method: ${methodName}, id: ${message.id}`);
+  
+  // Handle notifications (one-way messages that don't expect a response from MCP)
+  // Examples: notifications/initialized, notifications/progress, notifications/message
+  if (isNotification || methodName.startsWith('notifications/')) {
+    console.log(`[Handler] Notification ${methodName} - responding immediately without MCP subprocess`);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({})); // Empty response for notifications
+    return;
+  }
   
   ensureStdoutListener();
   const proc = getOrCreateMCPProcess();
@@ -396,7 +408,7 @@ const server = http.createServer((req, res) => {
   }
 
   // MCP endpoint
-  if ((req.url === '/' || req.url === '/mcp') && req.method === 'POST') {
+  if ((req.url === '/' || req.url === '/mcp' || req.url === '/mcp/') && req.method === 'POST') {
     let body = '';
 
     req.on('data', chunk => {
