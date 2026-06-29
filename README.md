@@ -49,6 +49,7 @@ This design prevents accidental data changes when the server is first deployed. 
 
 ## Environment Variables
 
+### TDX API Configuration
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `TDX_BASE_URL` | Yes | TDX Web API base URL (e.g. `https://yourorg.teamdynamix.com/TDWebApi/api`) |
@@ -57,6 +58,13 @@ This design prevents accidental data changes when the server is first deployed. 
 | `TDX_APP_ID` | Yes | Default TDX application ID (integer) |
 | `TDX_ASSETS_APP_ID` | No | TDX application ID for asset operations (integer). If not set, defaults to `TDX_APP_ID` |
 | `TDX_KB_APP_ID` | No | TDX application ID for knowledge base operations (integer). If not set, defaults to `TDX_APP_ID` |
+
+### Server Configuration
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `MCP_HTTP_PORT` | No | HTTP port for public deployment mode (e.g. `3000`). Only needed when running as an HTTP server. |
+| `MCP_API_KEY` | No | API key for public deployment authentication. Required when `MCP_HTTP_PORT` is set. |
+| `NODE_ENV` | No | Node environment (`development` or `production`). Default is `production`. |
 | `ALLOW_MODIFICATIONS` | No | Enable/disable modification tools. Set to `"true"` to enable 22 modification tools (create, update, delete). Default is `"false"` (safe mode - only 21 always-available tools accessible) |
 
 ## Architecture
