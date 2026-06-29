@@ -1,4 +1,0 @@
-{
-  "serverUrl": "http://YOUR-SERVER-IP:3000/mcp",
-  "bearerToken": "YOUR_API_KEY_HERE"
-}
