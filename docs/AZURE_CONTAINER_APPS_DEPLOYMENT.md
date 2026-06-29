@@ -5,10 +5,22 @@ This guide walks through deploying the TDX MCP Connector to **Azure Container Ap
 ## Overview
 
 - **Public Access**: The MCP server is accessible via HTTPS on the public internet
-- **Authentication**: Requires an API key in the `Authorization: Bearer <API_KEY>` header
+- **Authentication**: Requires a single API key, which can be sent as a Bearer token or in a direct header
 - **Infrastructure as Code**: Uses Bicep for infrastructure management
 - **Secure Credential Storage**: TDX credentials stored in Azure Key Vault, accessed via Managed Identity
 - **Azure CLI Deployment**: Direct deployment using Azure CLI (no azd dependency)
+
+## Table of Contents
+
+- [Quick Start (5 minutes)](#quick-start-5-minutes) - Deploy in minutes
+- [After Deployment](#after-deployment) - What you'll get
+- [Making API Requests](#making-api-requests) - Call your service
+- [Architecture](#architecture) - How it works
+- [Environment Variables](#environment-variables) - Configuration reference
+- [Post-Deployment Operations](#post-deployment-operations--maintenance) - Update, monitor, scale
+- [Security Best Practices](#security-best-practices) - Production hardening
+- [Advanced Configuration](#advanced-configuration) - Custom domains, CI/CD, etc.
+- [Troubleshooting](#troubleshooting) - Common issues
 
 ## Prerequisites
 
@@ -24,14 +36,13 @@ This guide walks through deploying the TDX MCP Connector to **Azure Container Ap
 Set your TDX credentials as environment variables (do NOT commit to git):
 
 ```powershell
-$env:TDX_BASE_URL = "https://service.pascocountyfl.net/TDWebApi/api"
+$env:TDX_BASE_URL = "https://<YOUR_TDX_API_DOMAIN>/TDWebApi/api"
 $env:TDX_BEID = "your-business-entity-id"
 $env:TDX_WEB_SERVICES_KEY = "your-web-services-api-key"
 ```
 
 **Security Note**: 
-- These credentials will be stored in Azure Key Vault, not in files or `.env`
-- `main.parameters.json` was deleted—credentials are passed via CLI `--parameters` flag
+- These credentials need to be stored in Azure Key Vault
 - Credentials are never stored in source control
 
 ### 2. Deploy with Azure CLI
@@ -44,11 +55,11 @@ az login
 az account set --subscription <subscription-id>
 
 # Create resource group
-az group create --name rg-tdx-mcp-dev --location eastus
+az group create --name <YOUR_RESOURCE_GROUP_NAME> --location eastus
 
 # Deploy Bicep template (creates Key Vault and Container App)
 az deployment group create `
-  --resource-group rg-tdx-mcp-dev `
+  --resource-group <YOUR_RESOURCE_GROUP_NAME> `
   --template-file infra/main.bicep `
   --parameters `
     location=eastus `
@@ -62,32 +73,54 @@ az deployment group create `
 
 ```powershell
 az containerapp show `
-  --name tdx-mcp-dev-XXXXX `
-  --resource-group rg-tdx-mcp-dev `
+  --name <CONTAINER_APP_NAME> `
+  --resource-group <YOUR_RESOURCE_GROUP_NAME> `
   --query "properties.configuration.ingress.fqdn" -o tsv
 ```
+
+✅ **Deployment complete!** Your MCP server is now running.
+
+## After Deployment
+
+**What you have:**
+- ✓ Public HTTPS endpoint (Container App FQDN)
+- ✓ API key for authentication (auto-generated in Bicep output)
+- ✓ TDX credentials secured in Azure Key Vault
+- ✓ Log Analytics workspace for monitoring
+- ✓ Auto-scaling configured (1-5 replicas)
+
+**Next steps:**
+1. Test your service with API requests (see below)
+2. Monitor performance in Azure Portal
+3. Integrate with Copilot or other MCP clients
 
 ## Making API Requests
 
 ### Using curl
 
 ```bash
-# List available tools
+# Using x-api-key header (recommended - simpler)
+curl -H "x-api-key: YOUR_API_KEY" \
+  https://<CONTAINER_APP_FQDN>/tools
+
+# Using Bearer token (HTTP standard format)
 curl -H "Authorization: Bearer YOUR_API_KEY" \
-  https://tdx-mcp-dev-xyz123.eastus.azurecontainer.io/tools
+  https://<CONTAINER_APP_FQDN>/tools
 
 # Call an MCP tool
 curl -X POST \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "x-api-key: YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"call_tool","params":{"name":"tdx-ticket-search","arguments":{"description":"test"}}}' \
-  https://tdx-mcp-dev-xyz123.eastus.azurecontainer.io/mcp
+  https://<CONTAINER_APP_FQDN>/mcp
 ```
+
+**Note:** Both methods send the same API key; Bearer is just the standard HTTP formatting convention.
 
 ### Health Check (No Auth Required)
 
 ```bash
-curl https://tdx-mcp-dev-xyz123.eastus.azurecontainer.io/health
+curl https://<CONTAINER_APP_FQDN>/health
 ```
 
 ## Architecture
@@ -121,12 +154,23 @@ The Container App is configured with:
 
 ### Authentication
 
-API key authentication is implemented in the HTTP wrapper:
+The HTTP wrapper validates a single API key using the `MCP_API_KEY` environment variable. The key can be sent using any of these header formats (all are equivalent):
 
-1. Checks `Authorization: Bearer <key>` header
-2. Compares against `MCP_API_KEY` environment variable
-3. Returns 401 Unauthorized if missing or invalid
-4. Exception endpoints (no auth required):
+1. **Direct headers** (simpler):
+   - `x-api-key: <key>` (recommended)
+   - `api-key: <key>`
+   - `x-functions-key: <key>`
+
+2. **Bearer token** (HTTP standard RFC 6750):
+   - `Authorization: Bearer <key>`
+
+**Validation logic:**
+- Extracts API key from any of the above formats
+- Compares against `MCP_API_KEY` environment variable
+- Returns 401 Unauthorized if missing or invalid
+- No difference in security — all methods transmit the same key over HTTPS
+
+**Exception endpoints (no auth required):**
    - `/health` - health check
    - `/status` - service status
    - `/tools` - list available tools
@@ -157,16 +201,15 @@ These are injected by the Container App from various sources:
 | `TDX_KB_APP_ID` | Bicep (hardcoded) | Knowledge Base application ID (114) |
 | `MCP_HTTP_PORT` | Bicep (hardcoded) | HTTP server port (3000) |
 | `MCP_API_KEY` | Container App secret | API key for authentication |
-| `NODE_ENV` | Bicep (hardcoded) | Environment (production for Azure, development for local) |
+| `NODE_ENV` | Bicep (parameter) | Environment mode ('dev' by default, 'production' if explicitly set). Set via `--parameters environment=production` at deployment time |
 | `ALLOW_MODIFICATIONS` | Bicep (hardcoded) | Enable create/update/delete operations (false) |
-| `MCP_HTTP_PORT` | Bicep (hardcoded) | HTTP server port (3000) |
 
 ### Local Development (.env)
 
 For local development, you can use `.env` with test values (excluded from git):
 
 ```bash
-TDX_BASE_URL=https://service.pascocountyfl.net/TDWebApi/api
+TDX_BASE_URL=https://<YOUR_TDX_API_DOMAIN>/TDWebApi/api
 TDX_BEID=your-business-entity-id-for-local-testing
 TDX_WEB_SERVICES_KEY=your-api-key-for-local-testing
 TDX_APP_ID=115
@@ -179,7 +222,6 @@ ALLOW_MODIFICATIONS=false
 ```
 
 **Production**:
-- `.env` and `infra/` folder are excluded by `.gitignore`
 - Credentials are passed via `--parameters` flag at deployment time
 - In production, all credentials come from Azure Key Vault only
 
@@ -217,17 +259,9 @@ package.json                       # Node.js dependencies and scripts
 - Update Container App secrets with `az containerapp secret set`
 - Map environment variables with `az containerapp update`
 
-## Scaling Configuration
+## Post-Deployment Operations & Maintenance
 
-The Container App automatically scales based on:
-
-- **Min Replicas**: 1 (always running)
-- **Max Replicas**: 5 (scales under load)
-- **Scale Rule**: HTTP requests (max 100 concurrent per replica)
-
-Adjust in `infra/main.bicep` under `template.scale`.
-
-## Monitoring and Logs
+### Monitoring and Logs
 
 View logs in Azure Portal:
 
@@ -243,7 +277,17 @@ View application metrics:
 - Request count and latency
 - Container restart events
 
-## Cost Considerations
+### Scaling Configuration
+
+The Container App automatically scales based on:
+
+- **Min Replicas**: 1 (always running)
+- **Max Replicas**: 5 (scales under load)
+- **Scale Rule**: HTTP requests (max 100 concurrent per replica)
+
+Adjust in `infra/main.bicep` under `template.scale`.
+
+### Cost Considerations
 
 **Typical monthly cost** (dev environment):
 
@@ -256,6 +300,38 @@ View application metrics:
 - Reduce max replicas for lower environments
 - Use smaller container specifications (0.25 vCPU / 512 MB)
 - Implement request rate limiting
+
+### Updating Deployment
+
+To update after code changes:
+
+```powershell
+# Rebuild Docker image and redeploy Container App
+$env:TDX_BEID = "your-beid"
+$env:TDX_WEB_SERVICES_KEY = "your-key"
+$env:TDX_BASE_URL = "your-url"
+
+az deployment group create `
+  --resource-group <YOUR_RESOURCE_GROUP_NAME> `
+  --template-file infra/main.bicep `
+  --parameters `
+    location=eastus `
+    environment=dev `
+    tdxBaseUrl=$env:TDX_BASE_URL `
+    tdxBeid=$env:TDX_BEID `
+    tdxWebServicesKey=$env:TDX_WEB_SERVICES_KEY
+```
+
+### Removing Deployment
+
+To delete all Azure resources:
+
+```powershell
+# Delete the entire resource group
+az group delete --name <YOUR_RESOURCE_GROUP_NAME> --yes
+```
+
+This removes the resource group and all associated resources (Container App, Key Vault, Log Analytics).
 
 ## Security Best Practices
 
@@ -296,7 +372,9 @@ az keyvault secret set --vault-name kv-tdx-mcp-XXXXX --name TdxWebServicesKey --
 - Implement request logging/auditing
 - Rotate API keys regularly
 
-## Updating an Existing Container App to Use Key Vault
+## Advanced Configuration
+
+### Updating an Existing Container App to Use Key Vault
 
 If you have an existing Container App running without Key Vault, follow these steps:
 
@@ -358,6 +436,48 @@ az containerapp update `
 
 The Container App automatically redeploys with the new configuration.
 
+### Custom Domain Name
+
+To use a custom domain with your Container App:
+
+1. Update your DNS provider with the Container App FQDN
+2. Configure custom domain in Container App settings
+3. Update client applications with new URL
+
+### VNet Integration
+
+For private network connectivity, modify `infra/main.bicep`:
+
+```bicep
+managedEnvironmentId: containerAppEnvironment.id
+// Add vnetConfiguration for private network
+```
+
+### CI/CD Pipeline
+
+Integrate with GitHub Actions or Azure Pipelines:
+
+```yaml
+# .github/workflows/deploy.yml
+- name: Deploy to Azure Container Apps
+  env:
+    TDX_BEID: ${{ secrets.TDX_BEID }}
+    TDX_WEB_SERVICES_KEY: ${{ secrets.TDX_WEB_SERVICES_KEY }}
+    TDX_BASE_URL: ${{ secrets.TDX_BASE_URL }}
+  run: |
+    az deployment group create \
+      --resource-group <YOUR_RESOURCE_GROUP_NAME> \
+      --template-file infra/main.bicep \
+      --parameters \
+        location=eastus \
+        environment=dev \
+        tdxBaseUrl=$TDX_BASE_URL \
+        tdxBeid=$TDX_BEID \
+        tdxWebServicesKey=$TDX_WEB_SERVICES_KEY
+```
+
+**Important**: Store TDX credentials as repository secrets, never commit them to git.
+
 ## Troubleshooting
 
 ### Container won't start
@@ -370,11 +490,12 @@ az containerapp logs show \
 
 ### 401 Unauthorized responses
 - Verify `MCP_API_KEY` environment variable is set
-- Check Authorization header format: `Bearer <key>`
+- Try using `x-api-key: <key>` header instead of Bearer token
+- Ensure API key matches exactly (case-sensitive)
 
 ### Container App fails to start after Key Vault integration
 - Verify Container App has Managed Identity enabled
-- Check Key Vault access policy: `az keyvault show-deleted --vault-name <name> --query id`
+- Check Key Vault access policy: `az keyvault show --vault-name <name> --query "properties.accessPolicies" -o table`
 - Verify Key Vault secrets exist: `az keyvault secret list --vault-name <name>`
 - Check Container App logs for Key Vault errors
 
@@ -406,81 +527,13 @@ az keyvault set-policy --name <key-vault-name> `
 - Review TDX API response times
 - Consider increasing max replicas for scale-out
 
-## Updating Deployment
+## Next Steps
 
-To update after code changes:
-
-```powershell
-# Rebuild Docker image and redeploy Container App
-$env:TDX_BEID = "your-beid"
-$env:TDX_WEB_SERVICES_KEY = "your-key"
-$env:TDX_BASE_URL = "your-url"
-
-az deployment group create `
-  --resource-group rg-tdx-mcp-dev `
-  --template-file infra/main.bicep `
-  --parameters `
-    location=eastus `
-    environment=dev `
-    tdxBaseUrl=$env:TDX_BASE_URL `
-    tdxBeid=$env:TDX_BEID `
-    tdxWebServicesKey=$env:TDX_WEB_SERVICES_KEY
-```
-
-## Removing Deployment
-
-To delete all Azure resources:
-
-```powershell
-# Delete the entire resource group
-az group delete --name rg-tdx-mcp-dev --yes
-```
-
-This removes the resource group and all associated resources (Container App, Key Vault, Log Analytics).
-
-## Advanced Configuration
-
-### Custom Domain Name
-
-To use a custom domain with your Container App:
-
-1. Update your DNS provider with the Container App FQDN
-2. Configure custom domain in Container App settings
-3. Update client applications with new URL
-
-### VNet Integration
-
-For private network connectivity, modify `infra/main.bicep`:
-
-```bicep
-managedEnvironmentId: containerAppEnvironment.id
-// Add vnetConfiguration for private network
-```
-
-### CI/CD Pipeline
-
-Integrate with GitHub Actions or Azure Pipelines:
-
-```yaml
-# .github/workflows/deploy.yml
-- name: Deploy to Azure Container Apps
-  env:
-    TDX_BEID: ${{ secrets.TDX_BEID }}
-    TDX_WEB_SERVICES_KEY: ${{ secrets.TDX_WEB_SERVICES_KEY }}
-    TDX_BASE_URL: ${{ secrets.TDX_BASE_URL }}
-  run: |
-    az deployment group create \
-      --resource-group rg-tdx-mcp-dev \
-      --template-file infra/main.bicep \
-      --parameters \
-        location=eastus \
-        environment=dev \
-        tdxBaseUrl=$TDX_BASE_URL \
-        tdxBeid=$TDX_BEID \
-        tdxWebServicesKey=$TDX_WEB_SERVICES_KEY
-```
-
-**Important**: Store TDX credentials as repository secrets, never commit them to git.
+After deployment:
+1. ✅ [Test API Requests](#making-api-requests) - Verify connectivity
+2. ✅ [Monitor & Scale](#post-deployment-operations--maintenance) - Watch performance
+3. ✅ [Integrate with Copilot](../docs/COPILOT_INTEGRATION.md) - Connect to AI clients
+4. ✅ [Review Security](security-best-practices) - Harden for production
 
 ## Support
 
@@ -489,3 +542,4 @@ For issues:
 2. Verify environment variables are set correctly
 3. Test TDX API connectivity independently
 4. Review Azure service health status
+5. See [Troubleshooting](#troubleshooting) section above
