@@ -19,13 +19,15 @@ This server exposes **43 tools** across **10 domains** — tickets, assets, CMDB
 
 ### Production Deployment
 
-**Recommended**: Deploy to **Azure Container Apps** for production use.
+**Recommended**: Deploy to **Azure App Service** for production use.
 
-See [docs/AZURE_CONTAINER_APPS_DEPLOYMENT.md](docs/AZURE_CONTAINER_APPS_DEPLOYMENT.md) for:
-- Azure Container Apps setup (recommended, managed service)
-- API key authentication
-- Auto-scaling and monitoring
-- Quick start deployment with `azd up`
+#### Quick Azure App Service Deployment
+1. Create an App Service plan and App Service in Azure
+2. Set environment variables in App Service → Configuration → Application settings
+3. Deploy using your preferred method:
+   - **Git Deployment**: Push to Azure repo
+   - **ZIP Deploy**: `az webapp deployment source config-zip`
+   - **Docker**: Deploy using `docker/Dockerfile` to Azure Container Registry
 
 For other deployment options:
 - **Copilot Studio Integration**: [docs/COPILOT_INTEGRATION.md](docs/COPILOT_INTEGRATION.md)
