@@ -22,10 +22,11 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const PORT = process.env.MCP_HTTP_PORT || 3000;
+const PORT = process.env.PORT || process.env.MCP_HTTP_PORT || 3000;
 const API_KEY = process.env.MCP_API_KEY || null;
 const ALLOW_UNAUTH_INITIALIZE = process.env.MCP_ALLOW_UNAUTH_INITIALIZE === 'true';
-const MCPscriptPath = join(__dirname, '..', 'dist', 'index.js');
+// When running from dist/http-wrapper.js, index.js is in the same directory
+const MCPscriptPath = join(__dirname, 'index.js');
 // Global fallback timeout for MCP requests in milliseconds
 const REQUEST_TIMEOUT_MS = parseInt(process.env.MCP_REQUEST_TIMEOUT_MS || '60000', 10);
 // Method-specific timeout overrides (milliseconds)
