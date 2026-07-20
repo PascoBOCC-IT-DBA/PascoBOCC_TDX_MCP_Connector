@@ -70,6 +70,15 @@ This design prevents accidental data changes when the server is first deployed. 
 | `NODE_ENV` | No | Node environment (`development` or `production`). Default is `production`. |
 | `ALLOW_MODIFICATIONS` | No | Enable/disable modification tools. Set to `"true"` to enable 22 modification tools (create, update, delete). Default is `"false"` (safe mode - only 21 always-available tools accessible) |
 
+### TDX API Rate Limiting
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `TDX_RATE_LIMIT_ENABLED` | No | `true` | Enable/disable rate limiting. Set to `"false"` to disable (not recommended). |
+| `TDX_RATE_LIMIT_CALLS` | No | `100` | Maximum API calls allowed per window (matches TDX's limit). |
+| `TDX_RATE_LIMIT_WINDOW_MS` | No | `60000` | Rate limit window duration in milliseconds (60 seconds). |
+| `TDX_RATE_LIMIT_BURST_CAPACITY_MULTIPLIER` | No | `1.5` | Burst capacity multiplier (e.g., 1.5 = up to 150 concurrent tokens). Helps handle traffic spikes without queuing. |
+| `TDX_RATE_LIMIT_QUEUE_TIMEOUT_MS` | No | `300000` | Maximum time (milliseconds) a request can wait in queue before being rejected (5 minutes). |
+
 ## Architecture
 
 ### Tool Organization

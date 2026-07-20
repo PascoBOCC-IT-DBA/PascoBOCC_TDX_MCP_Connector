@@ -13,6 +13,8 @@ import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import dotenv from 'dotenv';
+import { RateLimiter } from './rate-limiter.js';
+import { loadRateLimiterConfig } from './rate-limit-config.js';
 
 type JsonRpcId = string | number;
 
@@ -43,6 +45,46 @@ console.log(`[Startup] Request Timeout (default): ${REQUEST_TIMEOUT_MS}ms`);
 console.log(`[Startup] Request Timeout (initialize): ${INIT_TIMEOUT_MS}ms`);
 console.log(`[Startup] Request Timeout (tools/list): ${TOOLS_LIST_TIMEOUT_MS}ms`);
 console.log(`[Startup] Request Timeout (tools/call): ${TOOLS_CALL_TIMEOUT_MS}ms`);
+
+// Initialize Rate Limiter
+let rateLimiter: RateLimiter | null = null;
+let rateLimiterStatsInterval: NodeJS.Timeout | null = null;
+
+function initializeRateLimiter() {
+  try {
+    const config = loadRateLimiterConfig();
+    
+    if (!config.enabled) {
+      console.warn('[Startup] Rate limiting is DISABLED');
+      return;
+    }
+
+    rateLimiter = new RateLimiter(
+      config.callsPerWindow,
+      config.windowMs,
+      config.burstCapacityMultiplier
+    );
+
+    console.error(`[Startup] ✓ Rate limiter initialized: ${config.callsPerWindow} calls per ${config.windowMs}ms`);
+
+    // Log rate limiter stats every 30 seconds
+    rateLimiterStatsInterval = setInterval(() => {
+      if (rateLimiter) {
+        const stats = rateLimiter.getStats();
+        if (stats.queueDepth > 0) {
+          console.error(
+            `[Rate Limiter] Stats: tokens=${stats.tokensAvailable.toFixed(2)}, ` +
+            `queue=${stats.queueDepth}, requests=${stats.totalRequests}, ` +
+            `avg_wait=${stats.avgWaitTimeMs}ms`
+          );
+        }
+      }
+    }, 30000);
+  } catch (err) {
+    console.error(`[Startup] Failed to initialize rate limiter: ${err}`);
+    rateLimiter = null;
+  }
+}
 
 function getRequestTimeoutMs(message: any): number {
   const methodName = message?.method;
@@ -309,7 +351,7 @@ function ensureStdoutListener() {
 }
 
 // Handle MCP JSON-RPC requests
-function handleMcpRequest(message, res) {
+async function handleMcpRequest(message, res) {
   const hasMessageId = Object.prototype.hasOwnProperty.call(message, 'id');
   const isNotification = !hasMessageId; // Notifications don't have an ID in JSON-RPC 2.0
   const methodName = message.method || 'unknown';
@@ -324,6 +366,23 @@ function handleMcpRequest(message, res) {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({})); // Empty response for notifications
     return;
+  }
+
+  // Acquire rate limiter token before proceeding
+  if (rateLimiter) {
+    try {
+      const acquireStart = Date.now();
+      await rateLimiter.acquire();
+      const acquireTime = Date.now() - acquireStart;
+      if (acquireTime > 100) {
+        console.error(`[Rate Limiter] Request queued for ${acquireTime}ms`);
+      }
+    } catch (err) {
+      console.error(`[Rate Limiter] Failed to acquire token: ${err}`);
+      res.writeHead(429, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Service rate limit exceeded', details: (err as Error).message }));
+      return;
+    }
   }
   
   ensureStdoutListener();
@@ -521,7 +580,14 @@ const server = http.createServer((req, res) => {
           }
         }
 
-        handleMcpRequest(message, res);
+        // Call async handler
+        handleMcpRequest(message, res).catch((err) => {
+          console.error(`[HTTP] Unhandled error in handleMcpRequest: ${err}`);
+          if (!res.headersSent) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Internal server error' }));
+          }
+        });
       } catch (err) {
         console.error(`[HTTP] JSON parse error: ${err}`);
         res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -541,6 +607,8 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`[Startup] ✓ Endpoints: POST /mcp, GET /health, GET /tools, GET /status`);
   console.log(`[Startup] ✓ API Key: ${API_KEY ? 'REQUIRED' : 'NOT REQUIRED'}`);
   console.log('[Startup] ✓ Environment variables verified');
+  console.log('[Startup] ✓ Initializing rate limiter...');
+  initializeRateLimiter();
   console.log('[Startup] ✓ Spawning MCP subprocess...');
   // Pre-spawn MCP process to catch startup errors early
   getOrCreateMCPProcess();
@@ -572,6 +640,12 @@ console.log(`[Startup] PID: ${process.pid}`);
 
 process.on('SIGTERM', () => {
   console.log('[Shutdown] SIGTERM received, cleaning up...');
+  if (rateLimiterStatsInterval) {
+    clearInterval(rateLimiterStatsInterval);
+  }
+  if (rateLimiter) {
+    rateLimiter.shutdown();
+  }
   if (globalMcpProcess && !globalMcpProcess.killed) {
     globalMcpProcess.kill();
   }

@@ -94,7 +94,30 @@ azd env set TDX_ASSETS_APP_ID "<your-assets-app-id>"
 azd env set TDX_KB_APP_ID "<your-kb-app-id>"
 ```
 
-### Step 5: Preview Deployment (Recommended)
+### Step 5 (Optional): Configure Rate Limiting
+
+Rate limiting is **enabled by default** with safe values matching TDX's 100 calls/60s limit. Customize if needed:
+
+```bash
+# Enable/disable rate limiting (default: true - recommended)
+azd env set TDX_RATE_LIMIT_ENABLED "true"
+
+# API calls allowed per window (default: 100, matches TDX limit)
+azd env set TDX_RATE_LIMIT_CALLS "100"
+
+# Window duration in ms (default: 60000 = 60 seconds)
+azd env set TDX_RATE_LIMIT_WINDOW_MS "60000"
+
+# Burst capacity multiplier for spikes (default: 1.5 = 150 max tokens)
+azd env set TDX_RATE_LIMIT_BURST_CAPACITY_MULTIPLIER "1.5"
+
+# Queue timeout in ms (default: 300000 = 5 minutes)
+azd env set TDX_RATE_LIMIT_QUEUE_TIMEOUT_MS "300000"
+```
+
+For more information on rate limiting, see [API_REFERENCE.md#rate-limiting](./API_REFERENCE.md#rate-limiting).
+
+### Step 6 (Previously Step 5): Preview Deployment (Recommended)
 
 ```bash
 # Preview what will be created (no actual provisioning)
@@ -103,7 +126,7 @@ azd provision --preview
 # Review the what-if analysis output
 ```
 
-### Step 6: Provision Azure Resources
+### Step 7: Provision Azure Resources
 
 ```bash
 # Create Azure resources (App Service Plan, App Service, Key Vault)
@@ -130,7 +153,7 @@ azd deploy
 # - Start the application
 ```
 
-### Step 8: Verify Deployment
+### Step 9: Verify Deployment
 
 ```bash
 # Get deployment information

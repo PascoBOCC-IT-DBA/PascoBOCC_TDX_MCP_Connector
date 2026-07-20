@@ -284,6 +284,67 @@ Server-side error during tool execution
 }
 ```
 
+### 429 Rate Limit Exceeded
+Request queued in rate limiter for too long (>5 minutes) and was rejected
+```json
+{
+  "error": "Service rate limit exceeded",
+  "details": "Rate limiter queue timeout after 300000ms. Queue depth: 12. Consider reducing request rate or increasing timeout."
+}
+```
+
+## Rate Limiting
+
+The TDX MCP Connector enforces TeamDynamix's **100 API calls per 60 seconds** rate limit to protect the shared TDX instance.
+
+### How It Works
+
+**Token Bucket Algorithm:**
+- **Capacity**: 100 tokens per 60-second window (~1.67 tokens/second)
+- **Burst**: Up to 150 concurrent tokens (1.5x multiplier) to handle traffic spikes
+- **Queue**: Requests exceeding the rate limit are queued and processed in FIFO order
+- **Timeout**: Queued requests are rejected if they wait longer than 5 minutes
+
+### Client Behavior
+
+| Scenario | Behavior | Response Time |
+|----------|----------|-------|
+| **Light traffic** (<50 calls/min) | Immediate processing | < 10ms |
+| **Moderate spike** (50-100 calls/min) | Queued, then processed | 50-500ms |
+| **Heavy load** (100-200 calls/min) | Growing queue, increasing delays | 1-60 seconds |
+| **Extreme overload** (>200 calls/min) | Queue timeouts after 5 min | **429 error** |
+
+### Monitoring & Logs
+
+When requests are queued, the service logs periodic statistics (every 30 seconds):
+```
+[Rate Limiter] Stats: tokens=45.67, queue=3, requests=250, avg_wait=450ms
+```
+
+Key metrics:
+- `tokens` — Current available tokens (increases over time)
+- `queue` — Number of pending requests waiting for tokens
+- `requests` — Total requests processed since startup
+- `avg_wait` — Average wait time per queued request (milliseconds)
+
+### Configuration
+
+Rate limiting is controlled by environment variables (see [README.md](../README.md#environment-variables)):
+
+- `TDX_RATE_LIMIT_ENABLED` — Enable/disable (default: `true`)
+- `TDX_RATE_LIMIT_CALLS` — Calls per window (default: `100`)
+- `TDX_RATE_LIMIT_WINDOW_MS` — Window duration (default: `60000` ms)
+- `TDX_RATE_LIMIT_BURST_CAPACITY_MULTIPLIER` — Burst factor (default: `1.5`)
+- `TDX_RATE_LIMIT_QUEUE_TIMEOUT_MS` — Queue timeout (default: `300000` ms = 5 min)
+
+### Best Practices
+
+1. **Batch Requests** — Combine multiple queries into fewer API calls
+2. **Implement Exponential Backoff** — Retry 429 errors with increasing delays
+3. **Monitor Queue Depth** — Watch logs for `queue > 5` to detect sustained overload
+4. **Optimize Queries** — Use filters to reduce result sets and API calls
+5. **Distribute Traffic** — Stagger high-volume operations across time windows
+
 ## Implementation Examples
 
 ### JavaScript/Node.js
