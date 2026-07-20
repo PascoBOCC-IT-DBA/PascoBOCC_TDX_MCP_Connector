@@ -1,27 +1,26 @@
 # Azure App Service Deployment Guide - TDX MCP Connector
 
-This guide walks through deploying the TDX MCP Connector to Azure App Service using Azure Developer CLI (azd).
+This guide walks through deploying the TDX MCP Connector to Azure App Service using **Azure CLI (az)** — the modern, non-deprecated deployment approach.
 
 ## Prerequisites
 
 ### 1. Install Required Tools
-- **Azure CLI**: https://aka.ms/azure-cli
+- **Azure CLI 2.50+**: https://aka.ms/azure-cli
 - **Node.js 20+**: https://nodejs.org
-- **Azure Developer CLI (azd)**: https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/install-azd
+- **PowerShell 7+** (recommended) or PowerShell 5.1
 
 Verify installations:
-```bash
-az --version
-node --version
-azd --version
-npm --version
+```powershell
+az --version          # Should be 2.50+
+node --version        # Should be 20.x or higher
+pwsh --version        # PowerShell version
 ```
 
 ### 2. Azure Subscription Requirements
 - **Subscription ID**: `b0c08d7e-0820-4b4f-bc4b-2d2b5f6ad085`
-- **Region**: `eastus`
+- **Region**: `eastus2`
 - **Role Required**: Contributor or Owner on the subscription
-- **Resource Group**: Will create `rg-mcp-dev` during provisioning
+- **Existing Resource Group**: `TDX_MCP` (created separately)
 
 ### 3. TDX API Credentials
 Obtain these values from your TDX Administrator:
@@ -29,241 +28,369 @@ Obtain these values from your TDX Administrator:
 - `TDX_BEID` - Business Entity ID
 - `TDX_WEB_SERVICES_KEY` - Web Services API Key
 - `TDX_APP_ID` - Default Application ID (Tickets)
-- `TDX_ASSETS_APP_ID` - Assets/CMDB Application ID (optional)
-- `TDX_KB_APP_ID` - Knowledge Base Application ID (optional)
+- `TDX_ASSETS_APP_ID` - Assets/CMDB Application ID
+- `TDX_KB_APP_ID` - Knowledge Base Application ID
+- `MCP_API_KEY` - API key for MCP server access (generate a secure random string)
 
 ## Deployment Steps
 
 ### Step 1: Prepare Local Environment
 
-```bash
+```powershell
 # Navigate to project directory
 cd c:\_repos\PascoBOCC-IT-DBA\PascoBOCC_TDX_MCP_Connector
 
 # Install dependencies
 npm install
 
-# Build TypeScript
+# Build TypeScript (creates dist/ folder)
 npm run build
 
-# Verify build succeeds (should create dist/ folder)
-ls dist/
+# Verify build succeeds
+dir dist/
+# Should show: http-wrapper.js, index.js, config.js, auth.js, tdx-client.js, tools/ folder
 ```
 
 ### Step 2: Authenticate with Azure
 
-```bash
+```powershell
 # Login to Azure
-azd auth login
+az login
 
-# Select subscription (if prompted)
+# Set the subscription
 az account set --subscription "b0c08d7e-0820-4b4f-bc4b-2d2b5f6ad085"
+
+# Verify you're on the correct subscription
+az account show --query "name"
 ```
 
-### Step 3: Create AZD Environment
+### Step 3: Create/Configure Secrets in Azure Key Vault
 
-```bash
-# Initialize AZD environment
-azd env new
+The App Service needs access to TDX credentials via Key Vault. These must be created **before deployment**.
 
-# When prompted for environment name, use: mcp-dev
-# Region: eastus
+```powershell
+# Get the Key Vault resource ID (created separately or from existing resource)
+$keyVaultName = "tdx-mcp-kv"  # Must already exist in TDX_MCP resource group
+$resourceGroup = "TDX_MCP"
+
+# Set secrets in Key Vault (replace values with actual credentials)
+az keyvault secret set --vault-name $keyVaultName --name "TDX-BASE-URL" `
+  --value "https://service.pascocountyfl.net/TDWebApi/api"
+
+az keyvault secret set --vault-name $keyVaultName --name "TDX-BEID" `
+  --value "<your-beid>"
+
+az keyvault secret set --vault-name $keyVaultName --name "TDX-WEB-SERVICES-KEY" `
+  --value "<your-web-services-key>"
+
+az keyvault secret set --vault-name $keyVaultName --name "TDX-APP-ID" `
+  --value "<your-tickets-app-id>"
+
+az keyvault secret set --vault-name $keyVaultName --name "TDX-ASSETS-APP-ID" `
+  --value "<your-assets-app-id>"
+
+az keyvault secret set --vault-name $keyVaultName --name "TDX-KB-APP-ID" `
+  --value "<your-kb-app-id>"
+
+az keyvault secret set --vault-name $keyVaultName --name "MCP-API-KEY" `
+  --value "$(New-Guid)"  # Generate secure random string
 ```
 
-### Step 4: Configure Secrets
+### Step 4: Configure App Service Settings
 
-Create a `.env` file in the project root (DO NOT COMMIT to git):
+Configure the App Service to use Key Vault references for secrets:
 
-```bash
-# .env (local only, never commit)
-TDX_BASE_URL="https://service.pascocountyfl.net/TDWebApi/api"
-TDX_BEID="<your-beid>"
-TDX_WEB_SERVICES_KEY="<your-web-services-key>"
-TDX_APP_ID="<your-tickets-app-id>"
-TDX_ASSETS_APP_ID="<your-assets-app-id>"
-TDX_KB_APP_ID="<your-kb-app-id>"
+```powershell
+$appName = "TDX-MCP"
+$resourceGroup = "TDX_MCP"
+$keyVaultName = "tdx-mcp-kv"
+$keyVaultId = az keyvault show --name $keyVaultName --query id --output tsv
+
+# Set app configuration settings (Key Vault references for secrets)
+az webapp config appsettings set --resource-group $resourceGroup --name $appName `
+  --settings `
+    "WEBSITES_PORT=3000" `
+    "NODE_ENV=production" `
+    "ALLOW_MODIFICATIONS=false" `
+    "SCM_DO_BUILD_DURING_DEPLOYMENT=true" `
+    "TDX_BASE_URL=@Microsoft.KeyVault(SecretUri=https://$keyVaultName.vault.azure.net/secrets/TDX-BASE-URL/)" `
+    "TDX_BEID=@Microsoft.KeyVault(SecretUri=https://$keyVaultName.vault.azure.net/secrets/TDX-BEID/)" `
+    "TDX_WEB_SERVICES_KEY=@Microsoft.KeyVault(SecretUri=https://$keyVaultName.vault.azure.net/secrets/TDX-WEB-SERVICES-KEY/)" `
+    "TDX_APP_ID=@Microsoft.KeyVault(SecretUri=https://$keyVaultName.vault.azure.net/secrets/TDX-APP-ID/)" `
+    "TDX_ASSETS_APP_ID=@Microsoft.KeyVault(SecretUri=https://$keyVaultName.vault.azure.net/secrets/TDX-ASSETS-APP-ID/)" `
+    "TDX_KB_APP_ID=@Microsoft.KeyVault(SecretUri=https://$keyVaultName.vault.azure.net/secrets/TDX-KB-APP-ID/)" `
+    "MCP_API_KEY=@Microsoft.KeyVault(SecretUri=https://$keyVaultName.vault.azure.net/secrets/MCP-API-KEY/)"
+
+# Set the startup command (explicit Node entry point - don't let Oryx auto-generate)
+az webapp config set --resource-group $resourceGroup --name $appName `
+  --startup-file "node /home/site/wwwroot/dist/http-wrapper.js"
 ```
 
-Then set environment variables for AZD:
-```bash
-azd env set TDX_BASE_URL "https://service.pascocountyfl.net/TDWebApi/api"
-azd env set TDX_BEID "<your-beid>"
-azd env set TDX_WEB_SERVICES_KEY "<your-web-services-key>"
-azd env set TDX_APP_ID "<your-tickets-app-id>"
-azd env set TDX_ASSETS_APP_ID "<your-assets-app-id>"
-azd env set TDX_KB_APP_ID "<your-kb-app-id>"
+### Step 5: Configure Managed Identity Access to Key Vault
+
+The App Service uses Managed Identity to access Key Vault. Ensure it has permission:
+
+```powershell
+$appName = "TDX-MCP"
+$resourceGroup = "TDX_MCP"
+$keyVaultName = "tdx-mcp-kv"
+
+# Get the App Service's Managed Identity principal ID
+$principalId = az webapp identity show --resource-group $resourceGroup --name $appName `
+  --query principalId --output tsv
+
+# Grant Key Vault secret read permissions to the Managed Identity
+az keyvault set-policy --name $keyVaultName --object-id $principalId `
+  --secret-permissions get list
 ```
 
-### Step 5 (Optional): Configure Rate Limiting
+### Step 6: Build and Package the Application
 
-Rate limiting is **enabled by default** with safe values matching TDX's 100 calls/60s limit. Customize if needed:
+Create the deployment ZIP with ONLY the necessary files (dist/ + package.json + package-lock.json):
 
-```bash
-# Enable/disable rate limiting (default: true - recommended)
-azd env set TDX_RATE_LIMIT_ENABLED "true"
+```powershell
+# Build TypeScript
+npm run build
 
-# API calls allowed per window (default: 100, matches TDX limit)
-azd env set TDX_RATE_LIMIT_CALLS "100"
+# Create deployment package
+$zipPath = "deploy/azure-app-service/tdx-mcp-deploy.zip"
+if (Test-Path $zipPath) { Remove-Item $zipPath }
 
-# Window duration in ms (default: 60000 = 60 seconds)
-azd env set TDX_RATE_LIMIT_WINDOW_MS "60000"
+# Create minimal ZIP (Oryx will run npm ci at deploy time)
+Compress-Archive -Path @("dist", "package.json", "package-lock.json") `
+  -DestinationPath $zipPath
 
-# Burst capacity multiplier for spikes (default: 1.5 = 150 max tokens)
-azd env set TDX_RATE_LIMIT_BURST_CAPACITY_MULTIPLIER "1.5"
-
-# Queue timeout in ms (default: 300000 = 5 minutes)
-azd env set TDX_RATE_LIMIT_QUEUE_TIMEOUT_MS "300000"
+# Verify ZIP was created (should be < 500 KB)
+Get-Item $zipPath | Select-Object Name, @{Name="SizeMB"; Expression={[math]::Round($_.Length/1MB, 2)}}
 ```
 
-For more information on rate limiting, see [API_REFERENCE.md#rate-limiting](./API_REFERENCE.md#rate-limiting).
+### Step 7: Deploy to Azure App Service
 
-### Step 6 (Previously Step 5): Preview Deployment (Recommended)
+Deploy the ZIP file using the modern `az webapp deploy` command:
 
-```bash
-# Preview what will be created (no actual provisioning)
-azd provision --preview
+```powershell
+$appName = "TDX-MCP"
+$resourceGroup = "TDX_MCP"
+$zipPath = "deploy/azure-app-service/tdx-mcp-deploy.zip"
 
-# Review the what-if analysis output
+# Deploy the application
+# Oryx will automatically run: npm ci --production && npm run build
+az webapp deploy --resource-group $resourceGroup --name $appName `
+  --src-path $zipPath --type zip --async false
+
+Write-Host "Deployment complete. Oryx automatically ran npm ci and npm run build."
+Write-Host "App Service should be starting now..."
 ```
 
-### Step 7: Provision Azure Resources
+### Step 8: Verify Deployment
 
-```bash
-# Create Azure resources (App Service Plan, App Service, Key Vault)
-azd provision
+Test the application endpoints:
 
-# This will:
-# - Create resource group: rg-mcp-dev
-# - Create App Service Plan (B2 Linux)
-# - Create App Service (pasco-tdx-mcp)
-# - Create Key Vault with credentials
-# - Grant App Service Managed Identity access to Key Vault
+```powershell
+$appName = "TDX-MCP"
+$resourceGroup = "TDX_MCP"
+
+# Get the app hostname
+$hostname = az webapp show --resource-group $resourceGroup --name $appName `
+  --query defaultHostName --output tsv
+
+$baseUrl = "https://$hostname"
+
+# Test health endpoint
+Write-Host "Testing /health endpoint..."
+$health = curl -s "$baseUrl/health" | ConvertFrom-Json
+$health
+
+# Test /tools endpoint (should respect ALLOW_MODIFICATIONS=false)
+Write-Host "`nTesting /tools endpoint..."
+$tools = curl -s "$baseUrl/tools" | ConvertFrom-Json
+Write-Host "Number of tools registered: $($tools.tools.Count)"
+# Should show 21 tools (read-only only) since ALLOW_MODIFICATIONS=false
 ```
 
-### Step 7: Deploy Application
+### Optional: Configure Rate Limiting
 
-```bash
-# Deploy application code to App Service
-azd deploy
+Rate limiting is **enabled by default** with values matching TDX's API limits. Customize if needed:
 
-# This will:
-# - Build the application
-# - Package as deployment artifact
-# - Deploy to App Service
-# - Start the application
-```
-
-### Step 9: Verify Deployment
-
-```bash
-# Get deployment information
-azd env show
-
-# Test the application endpoint
-$url = az webapp show --resource-group rg-mcp-dev --name pasco-tdx-mcp --query defaultHostName --output tsv
-curl "https://$url/mcp"
+```powershell
+az webapp config appsettings set --resource-group $resourceGroup --name $appName `
+  --settings `
+    "TDX_RATE_LIMIT_ENABLED=true" `
+    "TDX_RATE_LIMIT_CALLS=60" `
+    "TDX_RATE_LIMIT_WINDOW_MS=60000" `
+    "TDX_RATE_LIMIT_BURST_CAPACITY_MULTIPLIER=1.5" `
+    "TDX_RATE_LIMIT_QUEUE_TIMEOUT_MS=300000"
 ```
 
 ## Monitoring & Troubleshooting
 
 ### View Application Logs
 
-```bash
-# Stream real-time logs from App Service
-az webapp log tail --resource-group rg-mcp-dev --name pasco-tdx-mcp
+```powershell
+$appName = "TDX-MCP"
+$resourceGroup = "TDX_MCP"
+
+# Stream real-time logs from App Service (tail last 50 lines)
+az webapp log tail --resource-group $resourceGroup --name $appName --lines 50
 
 # View deployment logs
-az webapp deployment log show --resource-group rg-mcp-dev --name pasco-tdx-mcp
+az webapp deployment log show --resource-group $resourceGroup --name $appName
 ```
 
-### Check App Service Status
+### Test Endpoints
 
-```bash
-# View App Service properties
-az webapp show --resource-group rg-mcp-dev --name pasco-tdx-mcp
+```powershell
+$appName = "TDX-MCP"
+$resourceGroup = "TDX_MCP"
 
-# List app configuration settings
-az webapp config appsettings list --resource-group rg-mcp-dev --name pasco-tdx-mcp
+$hostname = az webapp show --resource-group $resourceGroup --name $appName `
+  --query defaultHostName --output tsv
+
+$baseUrl = "https://$hostname"
+
+# Health check
+curl "$baseUrl/health"
+
+# List available tools (should be 21 since ALLOW_MODIFICATIONS=false)
+curl "$baseUrl/tools"
+
+# Call a read-only tool (example: search tickets)
+curl -X POST "$baseUrl/mcp" `
+  -Headers @{"Content-Type"="application/json"} `
+  -Body '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"tdx-ticket-search","arguments":{"maxResults":5}}}'
 ```
 
-### Verify Key Vault Secrets
+### Check App Service Configuration
 
-```bash
-# List secrets in Key Vault
-az keyvault secret list --resource-group rg-mcp-dev --vault-name <keyvault-name>
+```powershell
+$appName = "TDX-MCP"
+$resourceGroup = "TDX_MCP"
 
-# Get Key Vault name
-$kvName = az resource list --resource-group rg-mcp-dev --resource-type "Microsoft.KeyVault/vaults" --query "[0].name" --output tsv
-echo $kvName
+# View all app settings
+az webapp config appsettings list --resource-group $resourceGroup --name $appName
+
+# Check startup command
+az webapp config show --resource-group $resourceGroup --name $appName `
+  --query "appCommandLine" --output tsv
+
+# View Key Vault secret references
+az webapp config appsettings list --resource-group $resourceGroup --name $appName `
+  | Select-Object -ExpandProperty appSettings `
+  | Where-Object { $_.name -match "TDX_|MCP_API_KEY" } `
+  | Format-Table name, value
 ```
 
-### Common Issues
+### Verify Key Vault Access
 
-#### Application Won't Start
-```bash
-# Check application logs
-az webapp log tail --resource-group rg-mcp-dev --name pasco-tdx-mcp --lines 100
+```powershell
+$appName = "TDX-MCP"
+$resourceGroup = "TDX_MCP"
+$keyVaultName = "tdx-mcp-kv"
 
-# Verify environment variables are set
-az webapp config appsettings list --resource-group rg-mcp-dev --name pasco-tdx-mcp
+# Get App Service Managed Identity
+$principalId = az webapp identity show --resource-group $resourceGroup --name $appName `
+  --query principalId --output tsv
 
-# Restart App Service
-az webapp restart --resource-group rg-mcp-dev --name pasco-tdx-mcp
+Write-Host "App Service Principal ID: $principalId"
+
+# Check Key Vault access policies
+az keyvault show --name $keyVaultName `
+  --query "properties.accessPolicies[] | [?objectId=='$principalId'].permissions"
+
+# Verify secrets exist in Key Vault
+az keyvault secret list --vault-name $keyVaultName
 ```
 
-#### Key Vault Access Issues
-```bash
-# Verify Managed Identity has Key Vault access
-$principalId = az webapp identity show --resource-group rg-mcp-dev --name pasco-tdx-mcp --query principalId --output tsv
+### Common Issues & Solutions
 
-# List Key Vault access policies
-az keyvault show --resource-group rg-mcp-dev --name <keyvault-name>
+#### Application Won't Start (Check Logs)
 
-# Check if principal has secret permissions
-az keyvault secret list --resource-group rg-mcp-dev --vault-name <keyvault-name>
+```powershell
+# Tail logs immediately after restarting
+az webapp restart --resource-group $resourceGroup --name $appName
+Start-Sleep -Seconds 5
+az webapp log tail --resource-group $resourceGroup --name $appName --lines 100
 ```
 
-## Scaling & Performance
+**Common error messages:**
+- `require is not defined` → Oryx auto-generated start.js (FIX: Verify explicit startup command is set)
+- `Cannot find module` → npm ci didn't run (FIX: Verify SCM_DO_BUILD_DURING_DEPLOYMENT=true)
+- `Key Vault reference not resolved` → Managed Identity permission issue (FIX: Verify Key Vault access policy)
+- `ECONNREFUSED` on TDX API → TDX credentials invalid or network unreachable
 
-### Change App Service Plan
+#### Slow Deployment or Startup
 
-```bash
-# Upgrade to Standard plan (better performance)
-az appservice plan update --resource-group rg-mcp-dev --name asp-tdx-mcp --sku S1
+**Problem**: Deployment takes >3 minutes or app takes >1 minute to start
+**Causes**: 
+1. npm ci running on every startup (should only run once at deploy time)
+2. MCP subprocess initializing (creates child processes, may take 10-30s first time)
 
-# View available SKUs
-az appservice list-locations --query "[0].availableLinuxSkus[]" --output table
+**Solution**:
+- Verify `SCM_DO_BUILD_DURING_DEPLOYMENT=true`
+- Verify startup command is just `node /home/site/wwwroot/dist/http-wrapper.js` (NOT with npm ci)
+- Check logs for MCP subprocess initialization: `[MCP Child] Spawning subprocess...`
+
+#### /tools Endpoint Returns Wrong Count
+
+**Problem**: Returns 43 tools when ALLOW_MODIFICATIONS=false (should be 21)
+
+**Cause**: /tools endpoint is hardcoded instead of dynamic
+**Verify Fix**: Check src/http-wrapper.ts lines 501-530 have the dynamic endpoint implementation
+
+**Solution**:
+1. Rebuild locally: `npm run build`
+2. Recreate ZIP: `Compress-Archive -Path dist,package.json,package-lock.json -DestinationPath deploy/azure-app-service/tdx-mcp-deploy.zip`
+3. Redeploy: `az webapp deploy --resource-group TDX_MCP --name TDX-MCP --src-path deploy/azure-app-service/tdx-mcp-deploy.zip --type zip`
+
+#### Key Vault References Not Resolving
+
+**Problem**: Environment variables show `@Microsoft.KeyVault(...)` instead of actual values
+
+**Cause**: Managed Identity doesn't have permissions or Key Vault reference syntax is wrong
+
+**Solution**:
+```powershell
+# 1. Verify Managed Identity has permissions
+$principalId = az webapp identity show --resource-group $resourceGroup --name $appName --query principalId --output tsv
+az keyvault set-policy --name $keyVaultName --object-id $principalId --secret-permissions get list
+
+# 2. Restart app service to reload references
+az webapp restart --resource-group $resourceGroup --name $appName
 ```
 
-### Enable Application Insights
+## Deployment Checklist
 
-```bash
-# Create Application Insights
-az monitor app-insights component create \
-  --resource-group rg-mcp-dev \
-  --application-type web \
-  --kind web \
-  --app tdx-mcp-insights
+Before deploying, verify:
 
-# Link to App Service (requires manual configuration in Azure Portal)
+- [ ] `npm run build` completes without errors
+- [ ] `dist/` folder contains compiled files (http-wrapper.js, index.js, tools/)
+- [ ] `deploy/azure-app-service/tdx-mcp-deploy.zip` is < 500 KB (NOT > 8 MB)
+- [ ] Secrets exist in Key Vault (TDX_BASE_URL, TDX_BEID, etc.)
+- [ ] Managed Identity has Key Vault secret read permissions
+- [ ] Startup command is: `node /home/site/wwwroot/dist/http-wrapper.js`
+- [ ] `SCM_DO_BUILD_DURING_DEPLOYMENT=true`
+- [ ] `ALLOW_MODIFICATIONS=false` (for read-only tools only)
+
+## Deployment Success Indicators
+
+After deployment, you should see:
+
+1. **Azure Portal**: App Service status = "Running" (green)
+2. **Health endpoint**: `curl https://.../health` returns `{"status":"ok"}`
+3. **Tools endpoint**: `curl https://.../tools` returns array with 21 tools
+4. **Logs**: No error messages, clean startup sequence
+5. **Response time**: /health responds in < 100ms, /tools in < 500ms
+
+## Rollback Procedure
+
+If deployment goes wrong, revert to previous version:
+
+```powershell
+# List recent deployments
+az webapp deployment list --resource-group $resourceGroup --name $appName --query "[].{id:id, created:deploymentTime}"
+
+# Deploy previous ZIP (backup location)
+az webapp deploy --resource-group $resourceGroup --name $appName `
+  --src-path deploy/azure-app-service/tdx-mcp-deploy-backup.zip --type zip
 ```
-
-## Cleanup
-
-### Delete All Resources
-
-```bash
-# Delete entire resource group (removes all resources)
-az group delete --resource-group rg-mcp-dev
-
-# Or use AZD cleanup
-azd down
-```
-
-## Support
-
-For issues or questions:
-- Review application logs: `az webapp log tail --resource-group rg-mcp-dev --name pasco-tdx-mcp`
-- Check Azure Portal: https://portal.azure.com
-- Review Bicep templates: `infra/main.bicep`, `infra/app-service.bicep`, `infra/keyvault-only.bicep`
 
