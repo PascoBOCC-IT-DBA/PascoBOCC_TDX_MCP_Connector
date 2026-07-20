@@ -1,0 +1,80 @@
+location: eastus2
+name: tdx-mcp-app
+properties:
+  environmentId: /subscriptions/a783899a-bac9-45d2-a688-44a88d474562/resourceGroups/TDX_MCP/providers/Microsoft.App/managedEnvironments/tdx-mcp-env
+  template:
+    containers:
+    - name: tdx-mcp
+      image: tdxmcpacr.azurecr.io/tdx-mcp-connector:latest
+      resources:
+        cpu: '0.5'
+        memory: 1Gi
+      ports:
+      - containerPort: 3000
+        name: http
+      env:
+      - name: PORT
+        value: '3000'
+      - name: WEBSITES_PORT
+        value: '3000'
+      - name: NODE_ENV
+        value: production
+      - name: ALLOW_MODIFICATIONS
+        value: 'false'
+      - name: TDX_BASE_URL
+        secretRef: tdx-base-url
+      - name: TDX_BEID
+        secretRef: tdx-beid
+      - name: TDX_WEB_SERVICES_KEY
+        secretRef: tdx-web-services-key
+      - name: TDX_APP_ID
+        secretRef: tdx-app-id
+      - name: TDX_ASSETS_APP_ID
+        secretRef: tdx-assets-app-id
+      - name: TDX_KB_APP_ID
+        secretRef: tdx-kb-app-id
+      - name: MCP_API_KEY
+        secretRef: mcp-api-key
+    scale:
+      minReplicas: 0
+      maxReplicas: 10
+      rules:
+      - name: http-scaling
+        http:
+          metadata:
+            concurrentRequests: '100'
+    ingress:
+      external: true
+      targetPort: 3000
+      traffic:
+      - label: latest
+        latestRevision: true
+        weight: 100
+  registries:
+  - passwordSecretRef: acr-password
+    server: tdxmcpacr.azurecr.io
+    username: tdxmcpacr
+  secrets:
+  - name: acr-password
+    value: 5bXu1tDCYYdeHfxvxGfB6bp56ZN4tzJyJ86cteplGqgE26JxYxcNJQQJ99CGACHYHv6Eqg7NAAACAZCR18ys
+  - name: tdx-base-url
+    keyVaultUrl: https://TDX-MCP-Vault.vault.azure.net/secrets/tdx-base-url
+    identity: /subscriptions/a783899a-bac9-45d2-a688-44a88d474562/resourceGroups/TDX_MCP/providers/Microsoft.ManagedIdentity/userAssignedIdentities/
+  - name: tdx-beid
+    keyVaultUrl: https://TDX-MCP-Vault.vault.azure.net/secrets/tdx-beid
+    identity: /subscriptions/a783899a-bac9-45d2-a688-44a88d474562/resourceGroups/TDX_MCP/providers/Microsoft.ManagedIdentity/userAssignedIdentities/
+  - name: tdx-web-services-key
+    keyVaultUrl: https://TDX-MCP-Vault.vault.azure.net/secrets/tdx-web-services-key
+    identity: /subscriptions/a783899a-bac9-45d2-a688-44a88d474562/resourceGroups/TDX_MCP/providers/Microsoft.ManagedIdentity/userAssignedIdentities/
+  - name: tdx-app-id
+    keyVaultUrl: https://TDX-MCP-Vault.vault.azure.net/secrets/tdx-app-id
+    identity: /subscriptions/a783899a-bac9-45d2-a688-44a88d474562/resourceGroups/TDX_MCP/providers/Microsoft.ManagedIdentity/userAssignedIdentities/
+  - name: tdx-assets-app-id
+    keyVaultUrl: https://TDX-MCP-Vault.vault.azure.net/secrets/tdx-assets-app-id
+    identity: /subscriptions/a783899a-bac9-45d2-a688-44a88d474562/resourceGroups/TDX_MCP/providers/Microsoft.ManagedIdentity/userAssignedIdentities/
+  - name: tdx-kb-app-id
+    keyVaultUrl: https://TDX-MCP-Vault.vault.azure.net/secrets/tdx-kb-app-id
+    identity: /subscriptions/a783899a-bac9-45d2-a688-44a88d474562/resourceGroups/TDX_MCP/providers/Microsoft.ManagedIdentity/userAssignedIdentities/
+  - name: mcp-api-key
+    keyVaultUrl: https://TDX-MCP-Vault.vault.azure.net/secrets/mcp-api-key
+    identity: /subscriptions/a783899a-bac9-45d2-a688-44a88d474562/resourceGroups/TDX_MCP/providers/Microsoft.ManagedIdentity/userAssignedIdentities/
