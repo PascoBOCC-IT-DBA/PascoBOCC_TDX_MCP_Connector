@@ -2,7 +2,7 @@ name: Deploy TDX MCP Server
 
 on:
   push:
-    branches: [ main, AzureDeployment ]
+    branches: [ main ]
   workflow_dispatch:
 
 env:
