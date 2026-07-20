@@ -237,6 +237,7 @@ function getOrCreateMCPProcess() {
     env: {
       ...process.env,
       NODE_ENV: 'production',
+      ALLOW_MODIFICATIONS: process.env.ALLOW_MODIFICATIONS || 'false',
       TDX_BASE_URL: process.env.TDX_BASE_URL,
       TDX_BEID: process.env.TDX_BEID,
       TDX_WEB_SERVICES_KEY: process.env.TDX_WEB_SERVICES_KEY,
@@ -496,56 +497,37 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Tools list
+  // Tools list - query MCP subprocess dynamically so ALLOW_MODIFICATIONS is respected
   if (req.url === '/tools' && req.method === 'GET') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      tools: [
-        'tdx-ticket-create',
-        'tdx-ticket-search',
-        'tdx-ticket-get',
-        'tdx-ticket-update',
-        'tdx-ticket-patch',
-        'tdx-ticket-feed-get',
-        'tdx-ticket-feed-add',
-        'tdx-ticket-add-asset',
-        'tdx-ticket-add-contact',
-        'tdx-asset-create',
-        'tdx-asset-search',
-        'tdx-asset-get',
-        'tdx-asset-update',
-        'tdx-asset-patch',
-        'tdx-asset-delete',
-        'tdx-asset-categories',
-        'tdx-asset-feed-add',
-        'tdx-cmdb-create',
-        'tdx-cmdb-search',
-        'tdx-cmdb-get',
-        'tdx-cmdb-update',
-        'tdx-cmdb-delete',
-        'tdx-cmdb-feed-add',
-        'tdx-cmdb-add-relationship',
-        'tdx-kb-search',
-        'tdx-kb-create',
-        'tdx-kb-get',
-        'tdx-kb-update',
-        'tdx-kb-delete',
-        'tdx-people-get',
-        'tdx-people-search',
-        'tdx-people-lookup',
-        'tdx-people-update',
-        'tdx-project-create',
-        'tdx-project-search',
-        'tdx-project-get',
-        'tdx-project-update',
-        'tdx-account-get',
-        'tdx-account-search',
-        'tdx-group-get',
-        'tdx-group-search',
-        'tdx-attributes-get',
-        'tdx-statuses-get'
-      ]
-    }));
+    const toolsListMessage = { jsonrpc: '2.0', id: `tools-list-${Date.now()}`, method: 'tools/list', params: {} };
+    let savedStatus = 200;
+    let responded = false;
+    const fakeRes = {
+      get headersSent() { return responded; },
+      writeHead(code: number) { savedStatus = code; },
+      end(body: string) {
+        if (responded) return;
+        responded = true;
+        if (savedStatus === 200) {
+          try {
+            const parsed = JSON.parse(body);
+            const toolNames = (parsed?.result?.tools ?? []).map((t: { name: string }) => t.name);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ tools: toolNames }));
+            return;
+          } catch { /* fall through to raw */ }
+        }
+        res.writeHead(savedStatus, { 'Content-Type': 'application/json' });
+        res.end(body);
+      }
+    };
+    handleMcpRequest(toolsListMessage, fakeRes as unknown as ServerResponse).catch((err) => {
+      console.error(`[HTTP] /tools error: ${err}`);
+      if (!responded && !res.headersSent) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Failed to retrieve tools list' }));
+      }
+    });
     return;
   }
 
