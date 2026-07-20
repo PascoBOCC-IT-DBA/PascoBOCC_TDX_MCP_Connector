@@ -77,7 +77,7 @@ npm run build
 
 ```powershell
 # Build locally to verify
-docker build -t tdx-mcp-connector:test -f deploy/Dockerfile .
+docker build -t tdx-mcp-connector:test -f deploy/azure-container-apps/Dockerfile .
 
 # Run local test
 docker run -p 3000:3000 `
@@ -101,7 +101,7 @@ Run the deployment PowerShell script:
 ```powershell
 $subscriptionId = "YOUR_SUBSCRIPTION_ID"  # Get from: az account list --query "[?isDefault].id" -o tsv
 
-.\deploy\deploy-container-app.ps1 `
+.\deploy\azure-container-apps\deploy-container-app.ps1 `
     -SubscriptionId $subscriptionId `
     -ResourceGroup "TDX_MCP" `
     -Location "eastus2" `
