@@ -84,20 +84,25 @@ export function registerTicketCountTools(server: McpServer, client: TdxClient) {
           };
         }
 
-        // Add webLinks to each ticket in the results
-        result.forEach((ticket) => {
-          if (typeof ticket === 'object' && ticket !== null && 'ID' in ticket) {
-            (ticket as Record<string, unknown>).webLink = client.getTicketWebLink(
-              (ticket as Record<string, unknown>).ID as number,
-              app
-            );
-          }
-        });
+        // Filter to essential fields only for preview (to reduce context window bloat)
+        // Keep only fields needed by agent to understand ticket status and drill down
+        const previewTickets = result.map((ticket: Record<string, unknown>) => ({
+          ID: ticket.ID,
+          Title: ticket.Title,
+          StatusName: ticket.StatusName,
+          PriorityName: ticket.PriorityName,
+          CreatedDate: ticket.CreatedDate,
+          ResponsibleFullName: ticket.ResponsibleFullName,
+          ResponsibleGroupName: ticket.ResponsibleGroupName,
+          RequestorName: ticket.RequestorName,
+          AccountName: ticket.AccountName,
+          webLink: client.getTicketWebLink(ticket.ID as number, app),
+        }));
 
-        // Return count + preview tickets
+        // Return count + filtered preview tickets
         const response = {
           count: result.length,
-          tickets: result,
+          tickets: previewTickets,
         };
 
         return { content: [{ type: "text", text: JSON.stringify(response, null, 2) }] };
