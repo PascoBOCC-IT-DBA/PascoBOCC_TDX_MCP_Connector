@@ -1,13 +1,13 @@
 # TeamDynamix MCP Server - Tools Reference
 
-**Total Tools:** 43 tools across 10 categories  
+**Total Tools:** 44 tools across 10 categories  
 **Modification Status:** Modification tools (create, update, delete) are DISABLED by default. Enable via `ALLOW_MODIFICATIONS=true` environment variable only in authorized environments.
 
 ---
 
 ## Quick Navigation
 
-- [Tickets (9 tools)](#tickets)
+- [Tickets (10 tools)](#tickets)
 - [Assets (8 tools)](#assets)
 - [CMDB/Configuration Items (8 tools)](#cmdb)
 - [Knowledge Base (5 tools)](#knowledge-base)
@@ -88,6 +88,80 @@ Searches and filters TeamDynamix tickets. All filters combine with AND logic.
 ```
 
 **Notes:** Search text does not support filter syntax; case-insensitive. Empty results return empty array without error.
+
+---
+
+## tdx-ticket-count
+**Status:** ✅ ENABLED  
+**Type:** Read-only / Count + Preview
+
+Gets count of tickets matching filters and returns a preview of matching tickets (up to 200). Efficient for aggregate queries without retrieving full result sets.
+
+**Parameters:**
+All parameters match `tdx-ticket-search`:
+- `searchText` (string, optional) - Full-text search on title/description
+- `statusIds` (integer[], optional) - Filter by status IDs
+- `priorityIds` (integer[], optional) - Filter by priority IDs
+- `typeIds` (integer[], optional) - Filter by ticket type IDs
+- `accountIds` (integer[], optional) - Filter by account/department IDs
+- `requestorUids` (string[], optional) - Filter by requestor person UIDs
+- `responsibleUids` (string[], optional) - Filter by responsible person UIDs
+- `responsibleGroupIds` (integer[], optional) - Filter by responsible group IDs
+- `createdDateStart` (string, optional) - Filter by creation date start (ISO 8601 format)
+- `createdDateEnd` (string, optional) - Filter by creation date end (ISO 8601 format)
+- `modifiedDateStart` (string, optional) - Filter by modification date start (ISO 8601 format)
+- `modifiedDateEnd` (string, optional) - Filter by modification date end (ISO 8601 format)
+- `respondByDateStart` (string, optional) - Filter by respond by date start (ISO 8601 format)
+- `respondByDateEnd` (string, optional) - Filter by respond by date end (ISO 8601 format)
+- `closeByDateStart` (string, optional) - Filter by resolve by date start (ISO 8601 format)
+- `closeByDateEnd` (string, optional) - Filter by resolve by date end (ISO 8601 format)
+- `closedDateStart` (string, optional) - Filter by closed date start (ISO 8601 format)
+- `closedDateEnd` (string, optional) - Filter by closed date end (ISO 8601 format)
+- `respondedDateStart` (string, optional) - Filter by responded date start (ISO 8601 format)
+- `respondedDateEnd` (string, optional) - Filter by responded date end (ISO 8601 format)
+- `maxSummaryResults` (integer, optional) - Max tickets to include in response (default: 200)
+- `appId` (integer, optional) - Application ID (defaults to TDX_APP_ID)
+
+**Returns:** Object with count and preview tickets:
+```json
+{
+  "count": 1247,
+  "tickets": [
+    {
+      "ID": 12345,
+      "Title": "Network outage",
+      "StatusID": 1,
+      "PriorityID": 2,
+      "CreatedDate": "2026-07-22T10:00:00Z",
+      "webLink": "https://service.pascocountyfl.net/TDNext/Apps/115/Tickets/TicketDet?TicketID=12345"
+    }
+  ]
+}
+```
+
+**Lookup Pattern (Important):**
+Since parameters require IDs, use these metadata tools to resolve human-readable names → IDs:
+- **Status lookup**: `tdx-statuses-get` (componentType: "tickets") → returns ID for "Open", "Closed", etc.
+- **Account/Department lookup**: `tdx-account-search` (searchText: "group name") → returns ID
+- **Group lookup**: `tdx-group-search` (searchText: "group name") → returns ID
+- **Person lookup**: `tdx-people-search` (searchText: "person name") → returns UID
+- **Priority/Type lookup**: Use `tdx-ticket-search` with empty filters to explore available options
+
+**Example Workflow:**
+User asks: "How many open tickets assigned to group IT Support?"
+1. Call `tdx-group-search` with searchText "IT Support" → get group ID 42
+2. Call `tdx-statuses-get` with componentType "tickets" → find "Open" status ID 1
+3. Call `tdx-ticket-count` with statusIds: [1], responsibleGroupIds: [42]
+4. Response: { "count": 87, "tickets": [...] }
+
+**Use Cases:**
+- "How many open tickets?" - Resolve status first, then count
+- "How many tickets closed today?" - Use closedDateStart/closedDateEnd
+- "How many tickets by priority?" - Resolve priority IDs, then count
+- "How many open tickets for group XYZ?" - Resolve status + group, then count
+- Agent can use returned ticket IDs with tdx-ticket-get or tdx-ticket-search for details
+
+**Notes:** Efficient for Copilot agent queries to reduce context window usage vs. full search. Returns all fields from matching tickets (up to preview limit). Always resolve ID-based parameters via metadata tools first.
 
 ---
 

@@ -5,6 +5,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { loadConfig } from "./config.js";
 import { TdxClient } from "./tdx-client.js";
 import { registerTicketTools, registerTicketReadOnlyTools } from "./tools/tickets.js";
+import { registerTicketCountTools } from "./tools/counts.js";
 import { registerAssetTools, registerAssetReadOnlyTools } from "./tools/assets.js";
 import { registerCmdbTools, registerCmdbReadOnlyTools } from "./tools/cmdb.js";
 import { registerKbTools, registerKbReadOnlyTools } from "./tools/kb.js";
@@ -75,6 +76,11 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error("[TDX-MCP] Registering ticket read-only tools...");
     registerTicketReadOnlyTools(server, client);
     console.error("[TDX-MCP] Ticket read-only tools registered successfully!");
+
+    // Ticket count tools always enabled
+    console.error("[TDX-MCP] Registering ticket count tools...");
+    registerTicketCountTools(server, client);
+    console.error("[TDX-MCP] Ticket count tools registered successfully!");
 
     // Asset read-only tools always enabled
     console.error("[TDX-MCP] Registering asset read-only tools...");
