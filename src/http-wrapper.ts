@@ -511,9 +511,11 @@ const server = http.createServer((req, res) => {
         if (savedStatus === 200) {
           try {
             const parsed = JSON.parse(body);
-            const toolNames = (parsed?.result?.tools ?? []).map((t: { name: string }) => t.name);
+            // Return full tool objects with descriptions and input schemas (not just names)
+            // This is required for Copilot agents to properly enumerate and use tools
+            const tools = parsed?.result?.tools ?? [];
             res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ tools: toolNames }));
+            res.end(JSON.stringify({ tools }));
             return;
           } catch { /* fall through to raw */ }
         }
