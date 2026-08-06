@@ -19,19 +19,10 @@ This server exposes **43 tools** across **10 domains** — tickets, assets, CMDB
 
 ### Production Deployment
 
-**Recommended**: Deploy to **Azure App Service** for production use.
+Choose a deployment option based on your infrastructure preferences:
 
-#### Quick Azure App Service Deployment
-1. Create an App Service plan and App Service in Azure
-2. Set environment variables in App Service → Configuration → Application settings
-3. Deploy using your preferred method:
-   - **Git Deployment**: Push to Azure repo
-   - **ZIP Deploy**: `az webapp deployment source config-zip`
-   - **Docker**: Deploy using `docker/Dockerfile` to Azure Container Registry
-
-For other deployment options:
-- **Copilot Studio Integration**: [docs/COPILOT_INTEGRATION.md](docs/COPILOT_INTEGRATION.md)
-- **Legacy Ubuntu Deployment**: [docs/DEPLOYMENT_UBUNTU.md](docs/DEPLOYMENT_UBUNTU.md)
+- **Azure App Service** (Current Production) — See [docs/DEPLOYMENT_AZURE_APPSERVICE.md](docs/DEPLOYMENT_AZURE_APPSERVICE.md)
+- **GitHub Copilot / Copilot Studio Integration** — See [docs/COPILOT_INTEGRATION.md](docs/COPILOT_INTEGRATION.md)
 
 ## Tool Availability & Safety-by-Default Design
 
@@ -234,9 +225,8 @@ Common `componentId` values for `tdx-attributes-get`: `9` = Ticket, `27` = Asset
 ## Deployment
 
 For deployment instructions, see:
-- [docs/AZURE_CONTAINER_APPS_DEPLOYMENT.md](docs/AZURE_CONTAINER_APPS_DEPLOYMENT.md) for Azure Container Apps (recommended)
-- [docs/DEPLOYMENT_UBUNTU.md](docs/DEPLOYMENT_UBUNTU.md) for Ubuntu server deployment (legacy)
-- [docs/COPILOT_INTEGRATION.md](docs/COPILOT_INTEGRATION.md) for AI client integration
+- [docs/DEPLOYMENT_AZURE_APPSERVICE.md](docs/DEPLOYMENT_AZURE_APPSERVICE.md) — Azure App Service (current production)
+- [docs/COPILOT_INTEGRATION.md](docs/COPILOT_INTEGRATION.md) — AI client integration (GitHub Copilot, Copilot Studio)
 
 ## Documentation
 
@@ -245,8 +235,8 @@ For deployment instructions, see:
 | Document | Purpose |
 |----------|---------|
 | **[docs/TOOLS_REFERENCE.md](docs/TOOLS_REFERENCE.md)** | Complete reference for all 43 tools with parameters, return structures, and usage examples |
-| **[docs/AZURE_CONTAINER_APPS_DEPLOYMENT.md](docs/AZURE_CONTAINER_APPS_DEPLOYMENT.md)** | Azure Container Apps setup, deployment automation with `azd`, and production configuration (recommended) |
-| **[docs/DEPLOYMENT_UBUNTU.md](docs/DEPLOYMENT_UBUNTU.md)** | Ubuntu server deployment, systemd service setup, and legacy deployment configuration |
+| **[docs/API_REFERENCE.md](docs/API_REFERENCE.md)** | TDX API endpoints, authentication, and technical reference |
+| **[docs/DEPLOYMENT_AZURE_APPSERVICE.md](docs/DEPLOYMENT_AZURE_APPSERVICE.md)** | Azure App Service deployment, configuration, and verification |
 | **[docs/COPILOT_INTEGRATION.md](docs/COPILOT_INTEGRATION.md)** | GitHub Copilot Chat and Microsoft Copilot Studio integration instructions |
 
 For complete tool documentation, see [docs/TOOLS_REFERENCE.md](docs/TOOLS_REFERENCE.md).
@@ -291,20 +281,10 @@ PascoBOCC_TDX_MCP_Connector/
       groups.ts            # 2 group tools
       statuses.ts          # 1 status tool
       attributes.ts        # 1 custom attributes tool
-  deploy/
-    deploy-to-azure.sh     # Azure Container Apps deployment script
-    deploy-to-azure.ps1    # Azure Container Apps deployment (PowerShell)
-    azure-deploy.ps1       # Alternative Azure deployment script
-    azure.yaml             # Azure deployment configuration
-  infra/
-    main.bicep             # Infrastructure as Code template
-    main.parameters.json   # Bicep parameters
   docs/
-    AZURE_CONTAINER_APPS_DEPLOYMENT.md  # Recommended deployment guide
-    DEPLOYMENT_UBUNTU.md   # Legacy Ubuntu deployment guide
+    DEPLOYMENT_AZURE_APPSERVICE.md  # Azure App Service deployment guide
     COPILOT_INTEGRATION.md # AI client integration guide
     TOOLS_REFERENCE.md     # Complete tool documentation
-  tests/
-    *.ps1, *.sh, *.js      # Various test and verification scripts
+    API_REFERENCE.md       # TDX API reference
 ```
 
