@@ -11,6 +11,12 @@ export interface TdxConfig {
   kbAppId?: number;
 }
 
+export interface MaxResultsLimits {
+  withFilter: number;      // Max results when date filters present
+  withoutFilter: number;   // Max results when no filters
+  counts: number;          // Max results for counts/preview
+}
+
 export function loadConfig(): TdxConfig {
   const baseUrl = process.env.TDX_BASE_URL;
   const beid = process.env.TDX_BEID;
@@ -69,4 +75,19 @@ export function loadConfig(): TdxConfig {
   }
 
   return { baseUrl: baseUrl.replace(/\/+$/, ""), beid, webServicesKey, appId, assetsAppId, kbAppId };
+}
+
+/**
+ * Load maxResults limits from environment variables
+ * Defaults are Teams-friendly (lower) to prevent ConversationStateTooLarge errors
+ */
+export function loadMaxResultsLimits(): MaxResultsLimits {
+  return {
+    // With date filters: default 300 (down from 5000 to avoid Teams state overflow)
+    withFilter: parseInt(process.env.TDX_MAX_RESULTS_WITH_FILTER || '300', 10),
+    // Without filters: default 50 (down from 100)
+    withoutFilter: parseInt(process.env.TDX_MAX_RESULTS_WITHOUT_FILTER || '50', 10),
+    // Counts tool: default 100 (down from 200)
+    counts: parseInt(process.env.TDX_MAX_RESULTS_COUNTS || '100', 10),
+  };
 }

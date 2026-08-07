@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { TdxClient } from "../tdx-client.js";
+import { loadMaxResultsLimits } from "../config.js";
 
 export function registerProjectReadOnlyTools(server: McpServer, client: TdxClient) {
   server.tool(
@@ -48,7 +49,8 @@ export function registerProjectReadOnlyTools(server: McpServer, client: TdxClien
       if (params.startsDateStart !== undefined) body.Starts = params.startsDateStart;
       if (params.startsDateEnd !== undefined) body.Ends = params.startsDateEnd;
       const hasDateFilter = params.createdDateStart !== undefined || params.createdDateEnd !== undefined || params.startsDateStart !== undefined || params.startsDateEnd !== undefined;
-      const defaultMaxResults = hasDateFilter ? 5000 : 100;
+      const limits = loadMaxResultsLimits();
+      const defaultMaxResults = hasDateFilter ? limits.withFilter : limits.withoutFilter;
       body.MaxResults = params.maxResults ?? defaultMaxResults;
       try {
         const result = await client.post("/projects/search", body);

@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { TdxClient } from "../tdx-client.js";
+import { loadMaxResultsLimits } from "../config.js";
 
 // Read-only ticket tools (always registered)
 export function registerTicketReadOnlyTools(server: McpServer, client: TdxClient) {
@@ -86,14 +87,15 @@ export function registerTicketReadOnlyTools(server: McpServer, client: TdxClient
       if (params.respondedDateStart !== undefined) body.RespondedDateFrom = params.respondedDateStart;
       if (params.respondedDateEnd !== undefined) body.RespondedDateTo = params.respondedDateEnd;
       
-      // Smart maxResults default: 5000 if date filters present, 100 otherwise
+      // Smart maxResults default based on environment and filters
       const hasDateFilter = params.createdDateStart !== undefined || params.createdDateEnd !== undefined ||
                             params.modifiedDateStart !== undefined || params.modifiedDateEnd !== undefined ||
                             params.respondByDateStart !== undefined || params.respondByDateEnd !== undefined ||
                             params.closeByDateStart !== undefined || params.closeByDateEnd !== undefined ||
                             params.closedDateStart !== undefined || params.closedDateEnd !== undefined ||
                             params.respondedDateStart !== undefined || params.respondedDateEnd !== undefined;
-      const defaultMaxResults = hasDateFilter ? 5000 : 100;
+      const limits = loadMaxResultsLimits();
+      const defaultMaxResults = hasDateFilter ? limits.withFilter : limits.withoutFilter;
       body.MaxResults = params.maxResults ?? defaultMaxResults;
       try {
         const result = await client.post(`/${app}/tickets/search`, body);
