@@ -42,10 +42,10 @@ PS> .\create-keyvault-secrets.ps1 -KeyVaultName "my-kv" -ResourceGroupName "my-r
 
 # Then deploy:
 PS> ./deploy-gcc-with-sp.ps1 `
-  -ClientId "bc4ec195-3b31-4056-b163-37e9a735f817" `
-  -ClientSecret "c58M.poAjHa3l-Z_49oOe8A-7Zexj6531E" `
-  -TenantId "7aeca770-8b08-4f02-80da-be02168aff34" `
-  -SubscriptionId "f765501a-4338-4742-8501-340f57596c4b" `
+  -ClientId "<your-client-id>" `
+  -ClientSecret "<your-client-secret>" `
+  -TenantId "<your-tenant-id>" `
+  -SubscriptionId "<your-subscription-id>" `
   -ResourceGroup "TDX-MCP" `
   -AppName "TDX-MCP-APP" `
   -KeyVaultName "TDX-MCP-Vault"

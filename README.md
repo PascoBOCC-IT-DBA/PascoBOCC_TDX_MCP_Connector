@@ -19,10 +19,7 @@ This server exposes **43 tools** across **10 domains** — tickets, assets, CMDB
 
 ### Production Deployment
 
-Choose a deployment option based on your infrastructure preferences:
-
-- **Azure App Service** (Current Production) — See [docs/DEPLOYMENT_AZURE_APPSERVICE.md](docs/DEPLOYMENT_AZURE_APPSERVICE.md)
-- **GitHub Copilot / Copilot Studio Integration** — See [docs/COPILOT_INTEGRATION.md](docs/COPILOT_INTEGRATION.md)
+For Azure App Service deployment (current production), see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
 
 ## Tool Availability & Safety-by-Default Design
 
@@ -224,9 +221,7 @@ Common `componentId` values for `tdx-attributes-get`: `9` = Ticket, `27` = Asset
 
 ## Deployment
 
-For deployment instructions, see:
-- [docs/DEPLOYMENT_AZURE_APPSERVICE.md](docs/DEPLOYMENT_AZURE_APPSERVICE.md) — Azure App Service (current production)
-- [docs/COPILOT_INTEGRATION.md](docs/COPILOT_INTEGRATION.md) — AI client integration (GitHub Copilot, Copilot Studio)
+For deployment instructions, see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
 
 ## Documentation
 
@@ -234,10 +229,10 @@ For deployment instructions, see:
 
 | Document | Purpose |
 |----------|---------|
+| **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** | Complete Azure App Service deployment guide (prerequisites, workflow, troubleshooting) |
+| **[docs/KEYVAULT_SECRETS_SETUP.md](docs/KEYVAULT_SECRETS_SETUP.md)** | Azure Key Vault secrets configuration (required for all deployments) |
 | **[docs/TOOLS_REFERENCE.md](docs/TOOLS_REFERENCE.md)** | Complete reference for all 43 tools with parameters, return structures, and usage examples |
 | **[docs/API_REFERENCE.md](docs/API_REFERENCE.md)** | TDX API endpoints, authentication, and technical reference |
-| **[docs/DEPLOYMENT_AZURE_APPSERVICE.md](docs/DEPLOYMENT_AZURE_APPSERVICE.md)** | Azure App Service deployment, configuration, and verification |
-| **[docs/COPILOT_INTEGRATION.md](docs/COPILOT_INTEGRATION.md)** | GitHub Copilot Chat and Microsoft Copilot Studio integration instructions |
 
 For complete tool documentation, see [docs/TOOLS_REFERENCE.md](docs/TOOLS_REFERENCE.md).
 
@@ -282,9 +277,14 @@ PascoBOCC_TDX_MCP_Connector/
       statuses.ts          # 1 status tool
       attributes.ts        # 1 custom attributes tool
   docs/
-    DEPLOYMENT_AZURE_APPSERVICE.md  # Azure App Service deployment guide
-    COPILOT_INTEGRATION.md # AI client integration guide
+    DEPLOYMENT.md          # Azure App Service deployment guide
+    KEYVAULT_SECRETS_SETUP.md  # Key Vault secrets setup
     TOOLS_REFERENCE.md     # Complete tool documentation
     API_REFERENCE.md       # TDX API reference
+  deploy/
+    azure-app-service/
+      create-keyvault-secrets.ps1   # Script to create secrets in Key Vault
+      deploy-gcc-with-sp.ps1        # Deployment script
+      secrets.example.json          # Template for secrets (safe to commit)
 ```
 
