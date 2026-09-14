@@ -454,7 +454,13 @@ async function handleMcpRequest(message, res) {
 // HTTP Server
 const server = http.createServer((req, res) => {
   console.log(`[HTTP] ${req.method} ${req.url}`);
-  
+  // Diagnostic: surface any session/protocol headers a client sends us (we don't issue or require these)
+  const sessionHeader = req.headers['mcp-session-id'];
+  const protocolHeader = req.headers['mcp-protocol-version'];
+  if (sessionHeader || protocolHeader) {
+    console.log(`[HTTP] Client headers - Mcp-Session-Id: ${sessionHeader || 'none'}, Mcp-Protocol-Version: ${protocolHeader || 'none'}`);
+  }
+
   // CORS
   if (req.method === 'OPTIONS') {
     res.writeHead(200, {
