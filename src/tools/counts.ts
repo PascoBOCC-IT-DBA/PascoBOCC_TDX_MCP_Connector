@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { TdxClient } from "../tdx-client.js";
+import { loadMaxResultsLimits } from "../config.js";
 
 // Ticket count tool (always registered)
 export function registerTicketCountTools(server: McpServer, client: TdxClient) {
@@ -58,7 +59,7 @@ export function registerTicketCountTools(server: McpServer, client: TdxClient) {
       if (params.respondedDateStart !== undefined) body.RespondedDateFrom = params.respondedDateStart;
       if (params.respondedDateEnd !== undefined) body.RespondedDateTo = params.respondedDateEnd;
 
-      // Default maxResults to 200 for count tool (to include preview tickets)
+      // Default maxResults for count tool based on environment
       // Use same date filter detection as search tool for consistency
       const hasDateFilter = params.createdDateStart !== undefined || params.createdDateEnd !== undefined ||
                             params.modifiedDateStart !== undefined || params.modifiedDateEnd !== undefined ||
@@ -66,7 +67,8 @@ export function registerTicketCountTools(server: McpServer, client: TdxClient) {
                             params.closeByDateStart !== undefined || params.closeByDateEnd !== undefined ||
                             params.closedDateStart !== undefined || params.closedDateEnd !== undefined ||
                             params.respondedDateStart !== undefined || params.respondedDateEnd !== undefined;
-      const defaultMaxResults = hasDateFilter ? 5000 : 200;
+      const limits = loadMaxResultsLimits();
+      const defaultMaxResults = hasDateFilter ? limits.counts : Math.floor(limits.counts / 2);
       body.MaxResults = params.maxSummaryResults ?? defaultMaxResults;
 
       try {

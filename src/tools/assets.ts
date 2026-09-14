@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { TdxClient } from "../tdx-client.js";
+import { loadMaxResultsLimits } from "../config.js";
 
 export function registerAssetReadOnlyTools(server: McpServer, client: TdxClient) {
   const defaultAppId = client.assetsAppId ?? client.appId;
@@ -60,7 +61,8 @@ export function registerAssetReadOnlyTools(server: McpServer, client: TdxClient)
       if (params.acquisitionDateStart !== undefined) body.AcquisitionDateStart = params.acquisitionDateStart;
       if (params.acquisitionDateEnd !== undefined) body.AcquisitionDateEnd = params.acquisitionDateEnd;
       const hasDateFilter = params.createdDateStart !== undefined || params.createdDateEnd !== undefined || params.modifiedDateStart !== undefined || params.modifiedDateEnd !== undefined || params.acquisitionDateStart !== undefined || params.acquisitionDateEnd !== undefined;
-      const defaultMaxResults = hasDateFilter ? 5000 : 100;
+      const limits = loadMaxResultsLimits();
+      const defaultMaxResults = hasDateFilter ? limits.withFilter : limits.withoutFilter;
       body.MaxResults = params.maxResults ?? defaultMaxResults;
       try {
         const result = await client.post(`/${app}/assets/search`, body);

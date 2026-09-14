@@ -222,6 +222,30 @@ az webapp config appsettings set --resource-group $resourceGroup --name $appName
     "TDX_RATE_LIMIT_QUEUE_TIMEOUT_MS=300000"
 ```
 
+### Optional: Configure Result Set Limits (Teams Deployment)
+
+**For Teams Deployments ONLY** — to prevent `ConversationStateTooLarge` errors, result set limits are **reduced by default**:
+
+| Setting | Default | Previous | Why Changed |
+|---------|---------|----------|------------|
+| `TDX_MAX_RESULTS_WITH_FILTER` | 300 | 5000 | Teams conversation state has strict limits |
+| `TDX_MAX_RESULTS_WITHOUT_FILTER` | 50 | 100 | Prevent state overflow |
+| `TDX_MAX_RESULTS_COUNTS` | 100 | 200 | Smaller previews for stability |
+
+These **Teams-friendly defaults are already set**. Users can still request more results by explicitly passing `maxResults` parameter in their queries.
+
+If you need **Studio-like behavior** (higher limits), override these:
+
+```powershell
+az webapp config appsettings set --resource-group $resourceGroup --name $appName `
+  --settings `
+    "TDX_MAX_RESULTS_WITH_FILTER=5000" `
+    "TDX_MAX_RESULTS_WITHOUT_FILTER=100" `
+    "TDX_MAX_RESULTS_COUNTS=200"
+```
+
+**Note:** If you increase these limits and experience `ConversationStateTooLarge` errors in Teams again, reduce them back to defaults.
+
 ## Monitoring & Troubleshooting
 
 ### View Application Logs
