@@ -1,14 +1,20 @@
 #Requires -Version 7.0
-#Requires -Modules Az.KeyVault, Az.Accounts
 
 <#
 .SYNOPSIS
     Creates and manages Azure Key Vault secrets for the TDX MCP Connector application.
 
 .DESCRIPTION
-    This script creates all required and optional secrets in an Azure Key Vault for the
+    This script creates all required secrets in an Azure Key Vault for the
     TDX MCP Connector. It supports both interactive and parameter-driven modes, includes
     comprehensive error handling, and validates all secrets after creation.
+    
+    In Automated mode, the script uses Azure CLI by default (recommended) for better
+    automation support, falling back to Az PowerShell modules if needed.
+    
+    Requirements:
+    - Automated mode: Azure CLI installed and authenticated
+    - Interactive mode: Azure CLI OR Az.KeyVault + Az.Accounts modules
 
 .PARAMETER KeyVaultName
     The name of the Azure Key Vault (required).
@@ -21,8 +27,8 @@
 
 .PARAMETER Mode
     Execution mode: 'Interactive' (default) or 'Automated'.
-    - Interactive: Prompts for all secret values
-    - Automated: Requires all parameters via secrets JSON file
+    - Interactive: Prompts for all secret values (supports both CLI and PowerShell)
+    - Automated: Reads from secrets JSON file (uses CLI by default, PowerShell fallback)
 
 .PARAMETER SecretsFile
     Path to JSON file containing secrets (required for Automated mode).
@@ -33,32 +39,41 @@
         "TdxWebServicesKey": "your-api-key",
         "TdxAppId": "1",
         "TdxAssetsAppId": "2",
-        "TdxKbAppId": "3"
+        "TdxKbAppId": "3",
+        "McpApiKey": "your-mcp-api-key"
     }
 
 .PARAMETER Force
-    Skip confirmation prompts and overwrite existing secrets.
+    Skip confirmation prompts and overwrite existing secrets (useful in CI/CD).
 
 .PARAMETER VerifyOnly
     Only verify that secrets exist; do not create them.
 
+.PARAMETER UseCli
+    Force use of Azure CLI instead of Az PowerShell modules (recommended for automation).
+
 .EXAMPLE
-    # Interactive mode
+    # Interactive mode (prompts for values)
     .\create-keyvault-secrets.ps1 -KeyVaultName "my-kv" -ResourceGroupName "my-rg"
 
 .EXAMPLE
-    # Automated mode with secrets file
+    # Automated mode with secrets file (uses CLI by default)
     .\create-keyvault-secrets.ps1 -KeyVaultName "my-kv" -ResourceGroupName "my-rg" `
         -Mode Automated -SecretsFile "secrets.json" -Force
 
 .EXAMPLE
-    # Verify only
+    # Verify secrets exist without creating
     .\create-keyvault-secrets.ps1 -KeyVaultName "my-kv" -ResourceGroupName "my-rg" -VerifyOnly
+
+.EXAMPLE
+    # Force Azure CLI usage for automation
+    .\create-keyvault-secrets.ps1 -KeyVaultName "my-kv" -ResourceGroupName "my-rg" `
+        -Mode Automated -SecretsFile "secrets.json" -UseCli -Force
 
 .NOTES
     Author: TDX MCP Connector Team
-    Version: 1.0
-    Requires: Azure CLI or Az PowerShell modules installed
+    Version: 2.0 (Updated for Azure CLI-first automation support)
+    Requires: Azure CLI 2.50+ (recommended) or Az PowerShell modules
 #>
 
 param(
@@ -84,7 +99,10 @@ param(
     [switch]$Force,
 
     [Parameter(Mandatory = $false, HelpMessage = "Only verify secrets exist")]
-    [switch]$VerifyOnly
+    [switch]$VerifyOnly,
+
+    [Parameter(Mandatory = $false, HelpMessage = "Use Azure CLI instead of Az PowerShell (recommended)")]
+    [switch]$UseCli
 )
 
 # Script configuration
@@ -119,18 +137,53 @@ function Write-Log {
     Write-Host "[$timestamp] [$Level] $Message" -ForegroundColor $color
 }
 
+function Test-CliAvailable {
+    try {
+        $cliVersion = az --version 2>&1 | Select-Object -First 1
+        return $?
+    }
+    catch {
+        return $false
+    }
+}
+
 function Test-AzContext {
+    # In Automated mode, skip interactive login - assume already authenticated
+    if ($Mode -eq "Automated") {
+        Write-Log "Automated mode: skipping authentication prompt" "Info"
+        return $true
+    }
+
     try {
         $context = Get-AzContext
         if (-not $context) {
-            Write-Log "No Azure context found. Attempting to login..." "Warning"
-            Connect-AzAccount -ErrorAction Stop | Out-Null
-            return $true
+            Write-Log "No Azure context found. Please authenticate first." "Error"
+            Write-Log "Run: Connect-AzAccount" "Info"
+            return $false
         }
         return $true
     }
     catch {
-        Write-Log "Failed to establish Azure context: $_" "Error"
+        Write-Log "Failed to check Azure context: $_" "Error"
+        return $false
+    }
+}
+
+function Test-KeyVault-Cli {
+    param([string]$VaultName, [string]$ResourceGroup)
+    try {
+        $kv = az keyvault show --name $VaultName --resource-group $ResourceGroup 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            Write-Log "Key Vault found: $VaultName" "Success"
+            return $true
+        }
+        else {
+            Write-Log "Key Vault not found: $kv" "Error"
+            return $false
+        }
+    }
+    catch {
+        Write-Log "Error checking Key Vault: $_" "Error"
         return $false
     }
 }
@@ -144,6 +197,17 @@ function Test-KeyVault {
     }
     catch {
         Write-Log "Key Vault not found: $_" "Error"
+        return $false
+    }
+}
+
+function Test-SecretExists-Cli {
+    param([string]$VaultName, [string]$SecretName)
+    try {
+        $secret = az keyvault secret show --vault-name $VaultName --name $SecretName 2>&1
+        return $LASTEXITCODE -eq 0
+    }
+    catch {
         return $false
     }
 }
@@ -202,6 +266,42 @@ function Load-SecretsFromFile {
     }
 }
 
+function Create-KeyVaultSecret-Cli {
+    param(
+        [string]$VaultName,
+        [string]$SecretName,
+        [string]$SecretValue,
+        [bool]$Force = $false
+    )
+
+    try {
+        $exists = Test-SecretExists-Cli -VaultName $VaultName -SecretName $SecretName
+
+        if ($exists -and -not $Force) {
+            Write-Log "Secret '$SecretName' already exists. Use -Force to overwrite." "Warning"
+            return $false
+        }
+
+        if ($exists) {
+            Write-Log "Overwriting existing secret: $SecretName" "Warning"
+        }
+
+        $result = az keyvault secret set --vault-name $VaultName --name $SecretName --value $SecretValue 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            Write-Log "Created secret: $SecretName" "Success"
+            return $true
+        }
+        else {
+            Write-Log "Failed to create secret '$SecretName': $result" "Error"
+            return $false
+        }
+    }
+    catch {
+        Write-Log "Failed to create secret '$SecretName': $_" "Error"
+        return $false
+    }
+}
+
 function Create-KeyVaultSecret {
     param(
         [string]$VaultName,
@@ -235,6 +335,32 @@ function Create-KeyVaultSecret {
         Write-Log "Failed to create secret '$SecretName': $_" "Error"
         return $false
     }
+}
+
+function Verify-Secrets-Cli {
+    param(
+        [string]$VaultName,
+        [hashtable[]]$Secrets
+    )
+
+    Write-Log "Verifying secrets in Key Vault (using CLI)..." "Info"
+    $results = @()
+
+    foreach ($secret in $Secrets) {
+        $exists = Test-SecretExists-Cli -VaultName $VaultName -SecretName $secret.Name
+        $status = if ($exists) { "✓ Present" } else { "✗ Missing" }
+        $results += @{ Name = $secret.Name; Status = $status; Required = $true }
+        Write-Log "$status - $($secret.Name)" "Info"
+    }
+
+    $missing = $results | Where-Object { $_.Status -like "✗*" }
+    if ($missing) {
+        Write-Log "WARNING: $($missing.Count) required secret(s) are missing" "Warning"
+        return $false
+    }
+
+    Write-Log "All required secrets are present" "Success"
+    return $true
 }
 
 function Verify-Secrets {
@@ -273,32 +399,70 @@ Write-Log "Key Vault: $KeyVaultName" "Info"
 Write-Log "Resource Group: $ResourceGroupName" "Info"
 Write-Log "Mode: $Mode" "Info"
 
-# Verify Azure context
-if (-not (Test-AzContext)) {
-    exit 1
+# Determine whether to use CLI or PowerShell
+$useCliMethod = $UseCli
+if (-not $UseCli -and $Mode -eq "Automated") {
+    # In Automated mode, default to CLI if available
+    $useCliMethod = Test-CliAvailable
+    if ($useCliMethod) {
+        Write-Log "Detected Azure CLI - using CLI method for better automation support" "Info"
+    }
 }
 
-# Set subscription if provided
-if ($SubscriptionId) {
-    try {
-        Set-AzContext -SubscriptionId $SubscriptionId -ErrorAction Stop | Out-Null
-        Write-Log "Switched to subscription: $SubscriptionId" "Success"
-    }
-    catch {
-        Write-Log "Failed to set subscription: $_" "Error"
+# Verify authentication based on method
+if ($useCliMethod) {
+    Write-Log "Using Azure CLI" "Info"
+    if (-not (Test-CliAvailable)) {
+        Write-Log "ERROR: Azure CLI is not available. Please install it or use -UsePowerShell" "Error"
         exit 1
+    }
+    # CLI doesn't require explicit context check - it uses current login
+}
+else {
+    Write-Log "Using Azure PowerShell (Az modules)" "Info"
+    if (-not (Test-AzContext)) {
+        Write-Log "Please authenticate first: Connect-AzAccount" "Error"
+        exit 1
+    }
+
+    # Set subscription if provided
+    if ($SubscriptionId) {
+        try {
+            Set-AzContext -SubscriptionId $SubscriptionId -ErrorAction Stop | Out-Null
+            Write-Log "Switched to subscription: $SubscriptionId" "Success"
+        }
+        catch {
+            Write-Log "Failed to set subscription: $_" "Error"
+            exit 1
+        }
     }
 }
 
 # Verify Key Vault exists
-if (-not (Test-KeyVault -VaultName $KeyVaultName -ResourceGroup $ResourceGroupName)) {
-    exit 1
+Write-Log "Checking Key Vault availability..." "Info"
+if ($useCliMethod) {
+    if (-not (Test-KeyVault-Cli -VaultName $KeyVaultName -ResourceGroup $ResourceGroupName)) {
+        exit 1
+    }
+}
+else {
+    if (-not (Test-KeyVault -VaultName $KeyVaultName -ResourceGroup $ResourceGroupName)) {
+        exit 1
+    }
 }
 
 # Verify only mode
 if ($VerifyOnly) {
     Write-Log "Running in verification-only mode..." "Info"
-    $allSecretsValid = Verify-Secrets -VaultName $KeyVaultName -Secrets $RequiredSecrets
+    Write-Host ""
+    
+    if ($useCliMethod) {
+        $allSecretsValid = Verify-Secrets-Cli -VaultName $KeyVaultName -Secrets $RequiredSecrets
+    }
+    else {
+        $allSecretsValid = Verify-Secrets -VaultName $KeyVaultName -Secrets $RequiredSecrets
+    }
+    
     exit $(if ($allSecretsValid) { 0 } else { 1 })
 }
 
@@ -341,19 +505,21 @@ else {
     Write-Log "Loaded $($secretValues.Count) secrets from file" "Success"
 }
 
-# Confirmation
-Write-Host ""
-Write-Log "Ready to create the following secrets in Key Vault:" "Info"
-foreach ($name in $secretValues.Keys) {
-    Write-Log "  - $name" "Info"
-}
-
-if (-not $Force) {
+# Confirmation (skip in Automated mode with Force)
+if (-not ($Mode -eq "Automated" -and $Force)) {
     Write-Host ""
-    $confirmation = Read-Host "Continue? (yes/no)"
-    if ($confirmation -ne "yes") {
-        Write-Log "Operation cancelled by user" "Warning"
-        exit 0
+    Write-Log "Ready to create the following secrets in Key Vault:" "Info"
+    foreach ($name in $secretValues.Keys) {
+        Write-Log "  - $name" "Info"
+    }
+
+    if (-not $Force) {
+        Write-Host ""
+        $confirmation = Read-Host "Continue? (yes/no)"
+        if ($confirmation -ne "yes") {
+            Write-Log "Operation cancelled by user" "Warning"
+            exit 0
+        }
     }
 }
 
@@ -361,15 +527,35 @@ if (-not $Force) {
 Write-Host ""
 Write-Log "Creating secrets..." "Info"
 $successCount = 0
-foreach ($name in $secretValues.Keys) {
-    if (Create-KeyVaultSecret -VaultName $KeyVaultName -SecretName $name -SecretValue $secretValues[$name] -Force $Force) {
-        $successCount++
+
+if ($useCliMethod) {
+    foreach ($name in $secretValues.Keys) {
+        $value = $secretValues[$name]
+        if ($value -is [System.Security.SecureString]) {
+            $value = [System.Net.NetworkCredential]::new("", $value).Password
+        }
+        
+        if (Create-KeyVaultSecret-Cli -VaultName $KeyVaultName -SecretName $name -SecretValue $value -Force $Force) {
+            $successCount++
+        }
+    }
+}
+else {
+    foreach ($name in $secretValues.Keys) {
+        if (Create-KeyVaultSecret -VaultName $KeyVaultName -SecretName $name -SecretValue $secretValues[$name] -Force $Force) {
+            $successCount++
+        }
     }
 }
 
 # Verify all secrets
 Write-Host ""
-$allValid = Verify-Secrets -VaultName $KeyVaultName -Secrets $RequiredSecrets
+if ($useCliMethod) {
+    $allValid = Verify-Secrets-Cli -VaultName $KeyVaultName -Secrets $RequiredSecrets
+}
+else {
+    $allValid = Verify-Secrets -VaultName $KeyVaultName -Secrets $RequiredSecrets
+}
 
 # Summary
 Write-Host ""

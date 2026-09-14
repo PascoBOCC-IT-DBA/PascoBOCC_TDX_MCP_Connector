@@ -232,11 +232,21 @@ catch {
 }
 
 # ============================================================================
-# STEP 4: Verify Secrets Exist in Key Vault
+# STEP 4: Get Key Vault URL and Verify Secrets
 # ============================================================================
-Write-Host "`n[4/6] Verifying secrets in Key Vault..." -ForegroundColor Yellow
+Write-Host "`n[4/7] Verifying secrets in Key Vault..." -ForegroundColor Yellow
 
 try {
+    Write-Host "  Retrieving Key Vault details..." -ForegroundColor Gray
+    $kvDetails = az keyvault show --name $KeyVaultName --query "{id:id, vaultUri:properties.vaultUri}" -o json | ConvertFrom-Json
+    
+    if (-not $kvDetails.vaultUri) {
+        throw "Could not retrieve Key Vault URI"
+    }
+    
+    $keyVaultUri = $kvDetails.vaultUri
+    Write-Host "  Key Vault URI: $keyVaultUri" -ForegroundColor Gray
+    
     Write-Host "  Checking for required secrets..." -ForegroundColor Gray
     $missingSecrets = @()
     
@@ -267,9 +277,9 @@ catch {
 }
 
 # ============================================================================
-# STEP 5: Grant App Service Access to Key Vault
+# STEP 5: Grant App Service Managed Identity Access to Key Vault
 # ============================================================================
-Write-Host "`n[5/6] Granting App Service access to Key Vault..." -ForegroundColor Yellow
+Write-Host "`n[5/7] Granting App Service Managed Identity access to Key Vault..." -ForegroundColor Yellow
 
 try {
     Write-Host "  Getting App Service Managed Identity..." -ForegroundColor Gray
@@ -284,7 +294,7 @@ try {
     }
     
     Write-Host "  Principal ID: $appServiceId" -ForegroundColor Gray
-    Write-Host "  Setting Key Vault access policy..." -ForegroundColor Gray
+    Write-Host "  Setting Key Vault access policy (secret read permissions)..." -ForegroundColor Gray
     
     az keyvault set-policy `
         --name $KeyVaultName `
@@ -293,10 +303,10 @@ try {
         --output none
     
     if ($LASTEXITCODE -ne 0) {
-        throw "Failed to set Key Vault policy"
+        throw "Failed to set Key Vault access policy"
     }
     
-    Write-Host "  ✓ Key Vault access granted" -ForegroundColor Green
+    Write-Host "  ✓ App Service Managed Identity granted Key Vault access" -ForegroundColor Green
 }
 catch {
     Write-Host "✗ Step 5 failed: $_" -ForegroundColor Red
@@ -304,16 +314,15 @@ catch {
 }
 
 # ============================================================================
-# STEP 6: Configure App Service Settings
+# STEP 6: Configure App Service Settings with Key Vault URL
 # ============================================================================
-Write-Host "`n[6/6] Configuring App Service settings..." -ForegroundColor Yellow
+Write-Host "`n[6/7] Configuring App Service environment variables..." -ForegroundColor Yellow
 
 try {
-    Write-Host "  Applying settings via ARM REST API (bypasses cmd.exe parsing issues)..." -ForegroundColor Gray
+    Write-Host "  Setting application configuration via ARM REST API..." -ForegroundColor Gray
     
-    # Direct values, NOT Key Vault references: GCC App Service silently drops KV references
-    # before container startup, and SCM_DO_BUILD_DURING_DEPLOYMENT=true interferes with env
-    # var injection. See /memories/repo/azure-deployment-troubleshooting.md for the incident.
+    # Application will fetch TDX secrets from Key Vault using Managed Identity
+    # No direct secret values are stored in app settings (follows security best practices)
     $settingsBody = @{
         kind = "app"
         properties = @{
@@ -322,13 +331,7 @@ try {
             NODE_ENV                                = "production"
             ALLOW_MODIFICATIONS                     = "false"
             WEBSITE_NODE_DEFAULT_VERSION            = "24-lts"
-            TDX_BASE_URL                            = $tdxBaseUrl
-            TDX_BEID                                = $tdxBeid
-            TDX_WEB_SERVICES_KEY                    = $tdxWebServicesKey
-            TDX_APP_ID                              = $tdxAppId
-            TDX_ASSETS_APP_ID                       = $tdxAssetsAppId
-            TDX_KB_APP_ID                           = $tdxKbAppId
-            MCP_API_KEY                             = $mcpApiKey
+            KEYVAULT_URL                            = $keyVaultUri
             TDX_RATE_LIMIT_ENABLED                  = "true"
             TDX_RATE_LIMIT_CALLS                    = "60"
             TDX_RATE_LIMIT_WINDOW_MS                = "60000"
@@ -358,6 +361,7 @@ try {
     }
     
     Write-Host "  ✓ Application settings configured ($($settingsBody.properties.Count) settings)" -ForegroundColor Green
+    Write-Host "  Settings include: KEYVAULT_URL, environment config, and rate limiting" -ForegroundColor Gray
 }
 catch {
     Write-Host "✗ Step 6 failed: $_" -ForegroundColor Red
@@ -417,12 +421,21 @@ Write-Host "Summary:" -ForegroundColor Cyan
 Write-Host "  ✓ Service principal authenticated" -ForegroundColor Green
 Write-Host "  ✓ Application built and deployed" -ForegroundColor Green
 Write-Host "  ✓ Secrets verified in Key Vault" -ForegroundColor Green
-Write-Host "  ✓ App Service granted Key Vault access" -ForegroundColor Green
-Write-Host "  ✓ Application settings configured" -ForegroundColor Green
+Write-Host "  ✓ App Service Managed Identity configured" -ForegroundColor Green
+Write-Host "  ✓ Key Vault access granted to App Service" -ForegroundColor Green
+Write-Host "  ✓ KEYVAULT_URL environment variable set" -ForegroundColor Green
 Write-Host "  ✓ App Service restarted" -ForegroundColor Green
+
+Write-Host "`nKey Vault Configuration:" -ForegroundColor Cyan
+Write-Host "  Key Vault URI: $keyVaultUri" -ForegroundColor Gray
+Write-Host "  Required Secrets:" -ForegroundColor Gray
+$RequiredSecrets | ForEach-Object { Write-Host "    - $_" -ForegroundColor Gray }
 
 Write-Host "`nNext Steps:" -ForegroundColor Cyan
 Write-Host "  1. Verify the app: https://${AppName}.azurewebsites.us/health" -ForegroundColor Gray
 Write-Host "  2. Check logs: az webapp log tail --resource-group $ResourceGroup --name $AppName" -ForegroundColor Gray
 Write-Host "  3. Test tools: https://${AppName}.azurewebsites.us/tools" -ForegroundColor Gray
+Write-Host "  4. If Key Vault errors occur, verify:" -ForegroundColor Gray
+Write-Host "     - App Service Managed Identity has 'Key Vault Secrets User' role" -ForegroundColor Gray
+Write-Host "     - All required secrets exist in Key Vault" -ForegroundColor Gray
 Write-Host ""
