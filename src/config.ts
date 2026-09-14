@@ -1,4 +1,5 @@
 import dotenv from "dotenv";
+import { KeyVaultClient } from "./key-vault-client.js";
 
 dotenv.config();
 
@@ -17,64 +18,98 @@ export interface MaxResultsLimits {
   counts: number;          // Max results for counts/preview
 }
 
-export function loadConfig(): TdxConfig {
-  const baseUrl = process.env.TDX_BASE_URL;
-  const beid = process.env.TDX_BEID;
-  const webServicesKey = process.env.TDX_WEB_SERVICES_KEY;
-  const appIdStr = process.env.TDX_APP_ID;
-  const assetsAppIdStr = process.env.TDX_ASSETS_APP_ID;
-  const kbAppIdStr = process.env.TDX_KB_APP_ID;
+/**
+ * Load configuration from Azure Key Vault or environment variables
+ * Prefers Key Vault for sensitive values when available
+ * Falls back to environment variables for local development
+ */
+export async function loadConfig(): Promise<TdxConfig> {
+  // Initialize Key Vault client if KEYVAULT_URL is provided
+  const keyVaultUrl = process.env.KEYVAULT_URL;
+  const kvClient = new KeyVaultClient(keyVaultUrl || null);
 
-  if (!baseUrl) {
-    console.error("[CONFIG] FATAL: TDX_BASE_URL environment variable is not set");
-    console.error("[CONFIG] Required environment variables:");
-    console.error("[CONFIG]   - TDX_BASE_URL (e.g., https://yourorg.teamdynamix.com/TDWebApi/api)");
-    console.error("[CONFIG]   - TDX_BEID (Business Entity ID)");
-    console.error("[CONFIG]   - TDX_WEB_SERVICES_KEY (Web Services API Key)");
-    console.error("[CONFIG]   - TDX_APP_ID (integer, default ticket app ID)");
-    throw new Error("TDX_BASE_URL is required");
-  }
-  if (!beid) {
-    console.error("[CONFIG] FATAL: TDX_BEID environment variable is not set");
-    throw new Error("TDX_BEID is required");
-  }
-  if (!webServicesKey) {
-    console.error("[CONFIG] FATAL: TDX_WEB_SERVICES_KEY environment variable is not set");
-    throw new Error("TDX_WEB_SERVICES_KEY is required");
-  }
-  if (!appIdStr) {
-    console.error("[CONFIG] FATAL: TDX_APP_ID environment variable is not set");
-    throw new Error("TDX_APP_ID is required");
+  console.log("[CONFIG] Loading configuration...");
+  if (keyVaultUrl) {
+    console.log(`[CONFIG] Using Azure Key Vault: ${keyVaultUrl}`);
+  } else {
+    console.log("[CONFIG] KEYVAULT_URL not set, falling back to environment variables");
   }
 
-  const appId = parseInt(appIdStr, 10);
-  if (isNaN(appId)) {
-    console.error("[CONFIG] FATAL: TDX_APP_ID must be an integer");
-    console.error("[CONFIG] Received:", appIdStr);
-    throw new Error("TDX_APP_ID must be an integer");
-  }
+  try {
+    // Fetch secrets from Key Vault or environment variables
+    const baseUrl = await kvClient.getSecret("TdxBaseUrl", "TDX_BASE_URL");
+    const beid = await kvClient.getSecret("TdxBeid", "TDX_BEID");
+    const webServicesKey = await kvClient.getSecret("TdxWebServicesKey", "TDX_WEB_SERVICES_KEY");
+    const appIdStr = await kvClient.getSecret("TdxAppId", "TDX_APP_ID");
 
-  let assetsAppId: number | undefined;
-  if (assetsAppIdStr) {
-    assetsAppId = parseInt(assetsAppIdStr, 10);
-    if (isNaN(assetsAppId)) {
-      console.error("[CONFIG] FATAL: TDX_ASSETS_APP_ID must be an integer");
-      console.error("[CONFIG] Received:", assetsAppIdStr);
-      throw new Error("TDX_ASSETS_APP_ID must be an integer");
+    // Optional secrets
+    let assetsAppIdStr: string | undefined;
+    let kbAppIdStr: string | undefined;
+
+    try {
+      assetsAppIdStr = await kvClient.getSecret("TdxAssetsAppId", "TDX_ASSETS_APP_ID");
+    } catch {
+      console.log("[CONFIG] TdxAssetsAppId not found in Key Vault or environment");
     }
-  }
 
-  let kbAppId: number | undefined;
-  if (kbAppIdStr) {
-    kbAppId = parseInt(kbAppIdStr, 10);
-    if (isNaN(kbAppId)) {
-      console.error("[CONFIG] FATAL: TDX_KB_APP_ID must be an integer");
-      console.error("[CONFIG] Received:", kbAppIdStr);
-      throw new Error("TDX_KB_APP_ID must be an integer");
+    try {
+      kbAppIdStr = await kvClient.getSecret("TdxKbAppId", "TDX_KB_APP_ID");
+    } catch {
+      console.log("[CONFIG] TdxKbAppId not found in Key Vault or environment");
     }
-  }
 
-  return { baseUrl: baseUrl.replace(/\/+$/, ""), beid, webServicesKey, appId, assetsAppId, kbAppId };
+    // Validate and parse configuration
+    if (!baseUrl) {
+      console.error("[CONFIG] FATAL: TDX_BASE_URL is required");
+      console.error("[CONFIG] Set either KEYVAULT_URL env var for Key Vault or TDX_BASE_URL directly");
+      throw new Error("TDX_BASE_URL is required");
+    }
+    if (!beid) {
+      console.error("[CONFIG] FATAL: TDX_BEID is required");
+      throw new Error("TDX_BEID is required");
+    }
+    if (!webServicesKey) {
+      console.error("[CONFIG] FATAL: TDX_WEB_SERVICES_KEY is required");
+      throw new Error("TDX_WEB_SERVICES_KEY is required");
+    }
+    if (!appIdStr) {
+      console.error("[CONFIG] FATAL: TDX_APP_ID is required");
+      throw new Error("TDX_APP_ID is required");
+    }
+
+    const appId = parseInt(appIdStr, 10);
+    if (isNaN(appId)) {
+      console.error("[CONFIG] FATAL: TDX_APP_ID must be an integer");
+      console.error("[CONFIG] Received:", appIdStr);
+      throw new Error("TDX_APP_ID must be an integer");
+    }
+
+    let assetsAppId: number | undefined;
+    if (assetsAppIdStr) {
+      assetsAppId = parseInt(assetsAppIdStr, 10);
+      if (isNaN(assetsAppId)) {
+        console.error("[CONFIG] FATAL: TDX_ASSETS_APP_ID must be an integer");
+        console.error("[CONFIG] Received:", assetsAppIdStr);
+        throw new Error("TDX_ASSETS_APP_ID must be an integer");
+      }
+    }
+
+    let kbAppId: number | undefined;
+    if (kbAppIdStr) {
+      kbAppId = parseInt(kbAppIdStr, 10);
+      if (isNaN(kbAppId)) {
+        console.error("[CONFIG] FATAL: TDX_KB_APP_ID must be an integer");
+        console.error("[CONFIG] Received:", kbAppIdStr);
+        throw new Error("TDX_KB_APP_ID must be an integer");
+      }
+    }
+
+    console.log("[CONFIG] ✅ Configuration loaded successfully");
+    return { baseUrl: baseUrl.replace(/\/+$/, ""), beid, webServicesKey, appId, assetsAppId, kbAppId };
+  } catch (error) {
+    console.error("[CONFIG] ❌ Failed to load configuration:", error);
+    throw error;
+  }
 }
 
 /**

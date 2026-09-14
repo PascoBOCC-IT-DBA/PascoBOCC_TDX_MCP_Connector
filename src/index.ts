@@ -35,7 +35,7 @@ process.on('unhandledRejection', (reason, promise) => {
 (async () => {
   try {
     console.error("[TDX-MCP] Process started");
-    const config = loadConfig();
+    const config = await loadConfig();
     console.error("[TDX-MCP] Config loaded successfully");
     console.error(`[TDX-MCP] TDX Base URL: ${config.baseUrl}`);
     console.error("[TDX-MCP] Creating TDX client...");

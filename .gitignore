@@ -11,6 +11,11 @@ dist/
 .env.*.local
 .apikey
 
+# Secrets (deployment)
+secrets.json
+deploy/**/*.pem
+deploy/**/*.key
+
 # IDE
 .idea/
 .vscode/
@@ -30,7 +35,6 @@ app-logs/
 tdx-mcp.service
 .mcpserver
 .azure/
-deploy/
 infra/
 docker/
 
