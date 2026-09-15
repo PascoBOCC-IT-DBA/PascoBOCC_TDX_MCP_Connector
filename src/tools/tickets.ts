@@ -152,16 +152,17 @@ export function registerTicketReadOnlyTools(server: McpServer, client: TdxClient
       const app = params.appId ?? defaultAppId;
       try {
         const result = await client.get(`/${app}/tickets/${params.id}/feed`);
-        // Trim feed entries to essential fields only
+        // Trim feed entries to essential fields only (TDX field names: ID/Body/CreatedFullName, not EntryID/CommentText)
         const trimmed = Array.isArray(result)
           ? result.map((entry) => ({
-              EntryID: entry.EntryID,
-              EntryTypeID: entry.EntryTypeID,
-              EntryTypeDescription: entry.EntryTypeDescription,
-              CommentText: entry.CommentText,
+              ID: entry.ID,
               CreatedDate: entry.CreatedDate,
-              UpdatedDate: entry.UpdatedDate,
-              CreatedByFullName: entry.CreatedByFullName,
+              CreatedFullName: entry.CreatedFullName,
+              Body: entry.Body,
+              UpdateType: entry.UpdateType,
+              IsPrivate: entry.IsPrivate,
+              IsCommunication: entry.IsCommunication,
+              HasAttachment: entry.HasAttachment,
             }))
           : result;
         return { content: [{ type: "text", text: JSON.stringify(trimmed, null, 2) }] };
