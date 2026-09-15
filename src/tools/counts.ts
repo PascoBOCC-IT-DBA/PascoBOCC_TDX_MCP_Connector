@@ -20,7 +20,8 @@ export function registerTicketCountTools(server: McpServer, client: TdxClient) {
       accountIds: z.array(z.number()).optional().describe("Filter by account/department IDs. First call tdx-account-search to resolve department name to ID"),
       responsibleUids: z.array(z.string()).optional().describe("Filter by responsible person UIDs. First call tdx-people-search to resolve person name to UID"),
       responsibleGroupIds: z.array(z.number()).optional().describe("Filter by responsible group IDs. First call tdx-group-search to resolve group name to ID"),
-      requestorUids: z.array(z.string()).optional().describe("Filter by requestor UIDs. First call tdx-people-search to resolve person name to UID"),
+      requestorUids: z.array(z.string()).optional().describe("Filter by requestor UIDs (the person the ticket is FOR). Does NOT match tickets created on someone else's behalf - use createdByUid for that. First call tdx-people-search to resolve person name to UID"),
+      createdByUid: z.string().optional().describe("Filter by creator/author UID (the person who physically submitted/opened the ticket). Use this instead of requestorUids when searching for tickets a specific person created, since a person can create tickets on behalf of others. First call tdx-people-search to resolve person name to UID"),
       createdDateStart: z.string().optional().describe("Filter by creation date start (ISO 8601 format)"),
       createdDateEnd: z.string().optional().describe("Filter by creation date end (ISO 8601 format)"),
       modifiedDateStart: z.string().optional().describe("Filter by modification date start (ISO 8601 format)"),
@@ -46,6 +47,7 @@ export function registerTicketCountTools(server: McpServer, client: TdxClient) {
       if (params.responsibleUids !== undefined) body.ResponsibilityUids = params.responsibleUids;
       if (params.responsibleGroupIds !== undefined) body.ResponsibilityGroupIDs = params.responsibleGroupIds;
       if (params.requestorUids !== undefined) body.RequestorUids = params.requestorUids;
+      if (params.createdByUid !== undefined) body.CreatedByUid = params.createdByUid;
       if (params.createdDateStart !== undefined) body.CreatedDateFrom = params.createdDateStart;
       if (params.createdDateEnd !== undefined) body.CreatedDateTo = params.createdDateEnd;
       if (params.modifiedDateStart !== undefined) body.ModifiedDateFrom = params.modifiedDateStart;
@@ -94,6 +96,7 @@ export function registerTicketCountTools(server: McpServer, client: TdxClient) {
           StatusName: ticket.StatusName,
           PriorityName: ticket.PriorityName,
           CreatedDate: ticket.CreatedDate,
+          CreatedFullName: ticket.CreatedFullName,
           ResponsibleFullName: ticket.ResponsibleFullName,
           ResponsibleGroupName: ticket.ResponsibleGroupName,
           RequestorName: ticket.RequestorName,

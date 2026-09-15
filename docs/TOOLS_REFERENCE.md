@@ -34,7 +34,8 @@ Searches and filters TeamDynamix tickets. All filters combine with AND logic.
 - `priorityIds` (integer[], optional) - Filter by priority IDs
 - `typeIds` (integer[], optional) - Filter by ticket type IDs
 - `accountIds` (integer[], optional) - Filter by account/department IDs
-- `requestorUids` (string[], optional) - Filter by requestor person UIDs
+- `requestorUids` (string[], optional) - Filter by requestor person UIDs (the person the ticket is FOR, not necessarily who submitted it)
+- `createdByUid` (string, optional) - Filter by creator/author UID (the person who physically submitted/opened the ticket). Use this instead of `requestorUids` when searching for tickets a person **created**, since a person can create a ticket on behalf of someone else (in which case `requestorUids` would not match)
 - `responsibleUids` (string[], optional) - Filter by responsible person UIDs
 - `responsibleGroupIds` (integer[], optional) - Filter by responsible group IDs
 - `createdDateStart` (string, optional) - Filter by creation date start (ISO 8601 format)
@@ -104,7 +105,8 @@ All parameters match `tdx-ticket-search`:
 - `priorityIds` (integer[], optional) - Filter by priority IDs
 - `typeIds` (integer[], optional) - Filter by ticket type IDs
 - `accountIds` (integer[], optional) - Filter by account/department IDs
-- `requestorUids` (string[], optional) - Filter by requestor person UIDs
+- `requestorUids` (string[], optional) - Filter by requestor person UIDs (the person the ticket is FOR, not necessarily who submitted it)
+- `createdByUid` (string, optional) - Filter by creator/author UID (the person who physically submitted/opened the ticket). Use this instead of `requestorUids` when counting tickets a person **created**, since a person can create a ticket on behalf of someone else
 - `responsibleUids` (string[], optional) - Filter by responsible person UIDs
 - `responsibleGroupIds` (integer[], optional) - Filter by responsible group IDs
 - `createdDateStart` (string, optional) - Filter by creation date start (ISO 8601 format)
