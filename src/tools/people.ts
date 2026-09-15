@@ -43,10 +43,26 @@ export function registerPeopleReadOnlyTools(server: McpServer, client: TdxClient
       if (params.isActive !== undefined) body.IsActive = params.isActive;
       if (params.isEmployee !== undefined) body.IsEmployee = params.isEmployee;
       if (params.accountIds !== undefined) body.AccountIDs = params.accountIds;
-      if (params.maxResults !== undefined) body.MaxResults = params.maxResults;
+      // Always cap MaxResults - if TDX ignores/ misapplies a filter (observed with
+      // primaryEmail), an uncapped request returns the entire people directory (10MB+).
+      body.MaxResults = params.maxResults ?? 25;
       try {
         const result = await client.post("/people/search", body);
-        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        // Trim to essential fields - full person records carry dozens of unused fields
+        const people = Array.isArray(result)
+          ? result.map((p: Record<string, unknown>) => ({
+              UID: p.UID,
+              FullName: p.FullName,
+              PrimaryEmail: p.PrimaryEmail,
+              UserName: p.UserName,
+              IsActive: p.IsActive,
+              IsEmployee: p.IsEmployee,
+              DefaultAccountName: p.DefaultAccountName,
+              Title: p.Title,
+              ReportsToFullName: p.ReportsToFullName,
+            }))
+          : result;
+        return { content: [{ type: "text", text: JSON.stringify(people, null, 2) }] };
       } catch (e: unknown) {
         return { content: [{ type: "text", text: String(e) }], isError: true };
       }

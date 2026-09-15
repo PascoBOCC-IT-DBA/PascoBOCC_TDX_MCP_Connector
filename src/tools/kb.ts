@@ -41,7 +41,8 @@ export function registerKbReadOnlyTools(server: McpServer, client: TdxClient) {
       if (params.categoryIds !== undefined) body.CategoryIDs = params.categoryIds;
       if (params.status !== undefined) body.Status = params.status;
       if (params.ownerUids !== undefined) body.OwnerUids = params.ownerUids;
-      if (params.maxResults !== undefined) body.MaxResults = params.maxResults;
+      // Always cap MaxResults - TDX returns the entire unfiltered set if a filter is ignored/unmatched
+      body.MaxResults = params.maxResults ?? 25;
       try {
         const result = await client.post(`/${app}/knowledgebase/search`, body);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };

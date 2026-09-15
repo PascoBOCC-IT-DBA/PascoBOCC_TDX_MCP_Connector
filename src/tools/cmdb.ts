@@ -40,7 +40,8 @@ export function registerCmdbReadOnlyTools(server: McpServer, client: TdxClient) 
       if (params.isActive !== undefined) body.IsActive = params.isActive;
       if (params.owningDepartmentIds !== undefined) body.OwningDepartmentIDs = params.owningDepartmentIds;
       if (params.locationIds !== undefined) body.LocationIDs = params.locationIds;
-      if (params.maxResults !== undefined) body.MaxResults = params.maxResults;
+      // Always cap MaxResults - TDX returns the entire unfiltered set if a filter is ignored/unmatched
+      body.MaxResults = params.maxResults ?? 25;
       try {
         const result = await client.post(`/${appId}/cmdb/search`, body);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };

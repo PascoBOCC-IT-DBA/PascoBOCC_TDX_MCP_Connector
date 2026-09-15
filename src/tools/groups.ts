@@ -33,7 +33,8 @@ export function registerGroupTools(server: McpServer, client: TdxClient) {
       if (params.searchText !== undefined) body.NameLike = params.searchText;
       if (params.isActive !== undefined) body.IsActive = params.isActive;
       if (params.hasAppId !== undefined) body.HasAppID = params.hasAppId;
-      if (params.maxResults !== undefined) body.MaxResults = params.maxResults;
+      // Always cap MaxResults - TDX returns the entire unfiltered set if a filter is ignored/unmatched
+      body.MaxResults = params.maxResults ?? 25;
       try {
         const result = await client.post("/groups/search", body);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
