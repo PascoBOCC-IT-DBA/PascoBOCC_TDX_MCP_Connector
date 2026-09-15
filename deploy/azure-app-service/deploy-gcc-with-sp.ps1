@@ -53,29 +53,51 @@ PS> ./deploy-gcc-with-sp.ps1 `
 
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory=$false)]
     [string]$ClientId,
     
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory=$false)]
     [string]$ClientSecret,
     
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory=$false)]
     [string]$TenantId,
     
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory=$false)]
     [string]$SubscriptionId,
     
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory=$false)]
     [string]$ResourceGroup,
     
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory=$false)]
     [string]$AppName,
     
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory=$false)]
     [string]$KeyVaultName
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Load defaults from secrets.json
+$secretsPath = Join-Path (Split-Path $PSCommandPath -Parent) "secrets.json"
+if (Test-Path $secretsPath) {
+    $secrets = Get-Content $secretsPath | ConvertFrom-Json
+    if (-not $ClientId -and $secrets.ClientId) { $ClientId = $secrets.ClientId }
+    if (-not $ClientSecret -and $secrets.ClientSecret) { $ClientSecret = $secrets.ClientSecret }
+    if (-not $TenantId -and $secrets.TenantId) { $TenantId = $secrets.TenantId }
+    if (-not $SubscriptionId -and $secrets.SubscriptionId) { $SubscriptionId = $secrets.SubscriptionId }
+    if (-not $ResourceGroup -and $secrets.ResourceGroup) { $ResourceGroup = $secrets.ResourceGroup }
+    if (-not $AppName -and $secrets.AppName) { $AppName = $secrets.AppName }
+    if (-not $KeyVaultName -and $secrets.KeyVaultName) { $KeyVaultName = $secrets.KeyVaultName }
+}
+
+# Validate all required parameters are present
+@("ClientId", "ClientSecret", "TenantId", "SubscriptionId", "ResourceGroup", "AppName", "KeyVaultName") | ForEach-Object {
+    if (-not (Get-Variable -Name $_ -ValueOnly -ErrorAction SilentlyContinue)) {
+        Write-Host "ERROR: Missing required parameter: $_" -ForegroundColor Red
+        Write-Host "Please provide $_" -ForegroundColor Yellow
+        exit 1
+    }
+}
 
 # Required secrets that should exist in Key Vault
 $RequiredSecrets = @(

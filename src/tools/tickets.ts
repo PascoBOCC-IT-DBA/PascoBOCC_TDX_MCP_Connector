@@ -24,8 +24,20 @@ export function registerTicketReadOnlyTools(server: McpServer, client: TdxClient
         try {
           const result = await client.get(`/${app}/tickets/${params.id}`);
           const ticket = typeof result === 'object' && result !== null ? result as Record<string, unknown> : {};
-          ticket.webLink = client.getTicketWebLink(params.id, app);
-          return { content: [{ type: "text", text: JSON.stringify(ticket, null, 2) }] };
+          const trimmed = {
+            ID: ticket.ID,
+            FormattedNumber: ticket.FormattedNumber,
+            Title: ticket.Title,
+            StatusName: ticket.StatusName,
+            PriorityName: ticket.PriorityName,
+            CreatedDate: ticket.CreatedDate,
+            UpdatedDate: ticket.UpdatedDate,
+            ClosedDate: ticket.ClosedDate,
+            ResponsibleGroupName: ticket.ResponsibleGroupName,
+            RequestorFullName: ticket.RequestorFullName,
+            WebLink: client.getTicketWebLink(params.id, app),
+          };
+          return { content: [{ type: "text", text: JSON.stringify(trimmed, null, 2) }] };
         } catch (e: unknown) {
           return { content: [{ type: "text", text: String(e) }], isError: true };
         }
@@ -101,15 +113,23 @@ export function registerTicketReadOnlyTools(server: McpServer, client: TdxClient
       body.MaxResults = params.maxResults ?? defaultMaxResults;
       try {
         const result = await client.post(`/${app}/tickets/search`, body);
-        // Add webLinks to each ticket in the results
-        if (Array.isArray(result)) {
-          result.forEach((ticket) => {
-            if (typeof ticket === 'object' && ticket !== null && 'ID' in ticket) {
-              (ticket as Record<string, unknown>).webLink = client.getTicketWebLink((ticket as Record<string, unknown>).ID as number, app);
-            }
-          });
-        }
-        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        // Trim to essential fields only
+        const trimmed = Array.isArray(result)
+          ? result.map((ticket) => ({
+              ID: ticket.ID,
+              FormattedNumber: ticket.FormattedNumber,
+              Title: ticket.Title,
+              StatusName: ticket.StatusName,
+              PriorityName: ticket.PriorityName,
+              CreatedDate: ticket.CreatedDate,
+              UpdatedDate: ticket.UpdatedDate,
+              ClosedDate: ticket.ClosedDate,
+              ResponsibleGroupName: ticket.ResponsibleGroupName,
+              RequestorFullName: ticket.RequestorFullName,
+              WebLink: client.getTicketWebLink((ticket as Record<string, unknown>).ID as number, app),
+            }))
+          : result;
+        return { content: [{ type: "text", text: JSON.stringify(trimmed, null, 2) }] };
       } catch (e: unknown) {
         return { content: [{ type: "text", text: String(e) }], isError: true };
       }
@@ -128,7 +148,19 @@ export function registerTicketReadOnlyTools(server: McpServer, client: TdxClient
       const app = params.appId ?? defaultAppId;
       try {
         const result = await client.get(`/${app}/tickets/${params.id}/feed`);
-        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        // Trim feed entries to essential fields only
+        const trimmed = Array.isArray(result)
+          ? result.map((entry) => ({
+              EntryID: entry.EntryID,
+              EntryTypeID: entry.EntryTypeID,
+              EntryTypeDescription: entry.EntryTypeDescription,
+              CommentText: entry.CommentText,
+              CreatedDate: entry.CreatedDate,
+              UpdatedDate: entry.UpdatedDate,
+              CreatedByFullName: entry.CreatedByFullName,
+            }))
+          : result;
+        return { content: [{ type: "text", text: JSON.stringify(trimmed, null, 2) }] };
       } catch (e: unknown) {
         return { content: [{ type: "text", text: String(e) }], isError: true };
       }
