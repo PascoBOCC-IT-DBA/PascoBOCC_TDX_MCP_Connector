@@ -412,17 +412,30 @@ try {
     Write-Host "  Testing health endpoint..." -ForegroundColor Gray
     $appUrl = "https://${AppName}.azurewebsites.us/health"
     
-    try {
-        $response = Invoke-WebRequest -Uri $appUrl -SkipCertificateCheck -TimeoutSec 10 -ErrorAction Stop
-        if ($response.StatusCode -eq 200) {
-            Write-Host "  ✓ Health check passed (HTTP 200)" -ForegroundColor Green
-        } else {
-            Write-Host "  ⚠ Unexpected status code: $($response.StatusCode)" -ForegroundColor Yellow
+    # Retry loop - App Service cold starts can take longer than 30s
+    $maxAttempts = 6
+    $healthy = $false
+    for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+        try {
+            $response = Invoke-WebRequest -Uri $appUrl -SkipCertificateCheck -TimeoutSec 10 -ErrorAction Stop
+            if ($response.StatusCode -eq 200) {
+                Write-Host "  ✓ Health check passed (HTTP 200) - $($response.Content)" -ForegroundColor Green
+                $healthy = $true
+                break
+            } else {
+                Write-Host "  ⚠ Attempt ${attempt}/${maxAttempts}: unexpected status code $($response.StatusCode)" -ForegroundColor Yellow
+            }
+        }
+        catch {
+            Write-Host "  ⚠ Attempt ${attempt}/${maxAttempts}: endpoint not responding yet" -ForegroundColor Yellow
+        }
+        if ($attempt -lt $maxAttempts) {
+            Start-Sleep -Seconds 10
         }
     }
-    catch {
-        Write-Host "  ⚠ Health check failed (may need more time)" -ForegroundColor Yellow
-        Write-Host "     Try in 1-2 minutes: $appUrl" -ForegroundColor Gray
+    
+    if (-not $healthy) {
+        throw "Health endpoint did not return HTTP 200 after $maxAttempts attempts: $appUrl"
     }
     
     Write-Host "  ✓ App Service restarted" -ForegroundColor Green

@@ -14,16 +14,20 @@ export function registerTicketReadOnlyTools(server: McpServer, client: TdxClient
   try {
     server.tool(
       "tdx-ticket-get",
-      "Get a TDX ticket by ID",
+      "Get a TDX ticket by ID. Returns a trimmed summary by default; pass detailLevel: 'full' to get every field TDX returns (description, custom attributes, contacts, applications, approvals, etc.) for this one ticket. Use 'full' when the user asks for complete/detailed ticket information, not for bulk/list scenarios.",
       {
         appId: z.number().optional().describe("TDX app ID (defaults to env TDX_APP_ID)"),
         id: z.number().describe("Ticket ID"),
+        detailLevel: z.enum(["summary", "full"]).optional().describe("'summary' (default) returns 11 essential fields; 'full' returns the complete raw ticket record with all fields"),
       },
       async (params) => {
         const app = params.appId ?? defaultAppId;
         try {
           const result = await client.get(`/${app}/tickets/${params.id}`);
           const ticket = typeof result === 'object' && result !== null ? result as Record<string, unknown> : {};
+          if (params.detailLevel === "full") {
+            return { content: [{ type: "text", text: JSON.stringify(ticket, null, 2) }] };
+          }
           const trimmed = {
             ID: ticket.ID,
             FormattedNumber: ticket.FormattedNumber,
@@ -50,7 +54,7 @@ export function registerTicketReadOnlyTools(server: McpServer, client: TdxClient
 
   server.tool(
     "tdx-ticket-search",
-    "Search TDX tickets with filters",
+    "Search TDX tickets with filters. Always returns trimmed summaries (11 essential fields + WebLink) to control response size, even for a single matching ticket - this is not configurable for search since result sets can be large. To get full ticket detail (description, custom attributes, contacts, applications, approvals, etc.) for a specific ticket found here, call tdx-ticket-get with that ticket's ID and detailLevel: 'full'.",
     {
       appId: z.number().optional().describe("TDX app ID (defaults to env TDX_APP_ID)"),
       searchText: z.string().optional().describe("Full-text search query"),
