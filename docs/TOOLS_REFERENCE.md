@@ -36,7 +36,7 @@ Searches and filters TeamDynamix tickets. All filters combine with AND logic.
 - `accountIds` (integer[], optional) - Filter by account/department IDs
 - `requestorUids` (string[], optional) - Filter by requestor person UIDs (the person the ticket is FOR, not necessarily who submitted it)
 - `createdByUid` (string, optional) - Filter by creator/author UID (the person who physically submitted/opened the ticket). Use this instead of `requestorUids` when searching for tickets a person **created**, since a person can create a ticket on behalf of someone else (in which case `requestorUids` would not match)
-- `responsibleUids` (string[], optional) - Filter by responsible person UIDs
+- `responsibleUids` (string[], optional) - Filter by responsible person UIDs. Matches the ticket's own responsible person only. TDX's underlying `ResponsibilityUids` parameter also matches task-level responsibility, so the server post-filters results on the ticket's `ResponsibleUid`
 - `responsibleGroupIds` (integer[], optional) - Filter by responsible group IDs
 - `createdDateStart` (string, optional) - Filter by creation date start (ISO 8601 format)
 - `createdDateEnd` (string, optional) - Filter by creation date end (ISO 8601 format)
@@ -96,7 +96,7 @@ Searches and filters TeamDynamix tickets. All filters combine with AND logic.
 **Status:** ✅ ENABLED  
 **Type:** Read-only / Count + Preview
 
-Gets count of tickets matching filters and returns a preview of matching tickets (up to 200). Efficient for aggregate queries without retrieving full result sets.
+Gets count of tickets matching filters and returns a preview of matching tickets. `count` always reflects the full match set; `maxSummaryResults` only limits the preview array. Efficient for aggregate queries without retrieving full result sets.
 
 **Parameters:**
 All parameters match `tdx-ticket-search`:
@@ -107,7 +107,7 @@ All parameters match `tdx-ticket-search`:
 - `accountIds` (integer[], optional) - Filter by account/department IDs
 - `requestorUids` (string[], optional) - Filter by requestor person UIDs (the person the ticket is FOR, not necessarily who submitted it)
 - `createdByUid` (string, optional) - Filter by creator/author UID (the person who physically submitted/opened the ticket). Use this instead of `requestorUids` when counting tickets a person **created**, since a person can create a ticket on behalf of someone else
-- `responsibleUids` (string[], optional) - Filter by responsible person UIDs
+- `responsibleUids` (string[], optional) - Filter by responsible person UIDs. Matches the ticket's own responsible person only (see note under `tdx-ticket-search`)
 - `responsibleGroupIds` (integer[], optional) - Filter by responsible group IDs
 - `createdDateStart` (string, optional) - Filter by creation date start (ISO 8601 format)
 - `createdDateEnd` (string, optional) - Filter by creation date end (ISO 8601 format)
@@ -121,13 +121,15 @@ All parameters match `tdx-ticket-search`:
 - `closedDateEnd` (string, optional) - Filter by closed date end (ISO 8601 format)
 - `respondedDateStart` (string, optional) - Filter by responded date start (ISO 8601 format)
 - `respondedDateEnd` (string, optional) - Filter by responded date end (ISO 8601 format)
-- `maxSummaryResults` (integer, optional) - Max tickets to include in response (default: 200)
+- `maxSummaryResults` (integer, optional) - Max tickets to include in the preview array (default: 200). **Does not affect `count`.**
 - `appId` (integer, optional) - Application ID (defaults to TDX_APP_ID)
 
 **Returns:** Object with count and preview tickets:
 ```json
 {
   "count": 1247,
+  "countIsExact": true,
+  "previewCount": 100,
   "tickets": [
     {
       "ID": 12345,
@@ -140,6 +142,8 @@ All parameters match `tdx-ticket-search`:
   ]
 }
 ```
+
+**Count accuracy:** The server queries TDX with a scan ceiling (`TDX_MAX_RESULTS_COUNT_SCAN`, default 10000) that is independent of `maxSummaryResults`. If the match set hits that ceiling, `countIsExact` is `false`, `count` is a floor rather than a total, and a `note` field explains it. Always check `countIsExact` before reporting a number.
 
 **Lookup Pattern (Important):**
 Since parameters require IDs, use these metadata tools to resolve human-readable names → IDs:

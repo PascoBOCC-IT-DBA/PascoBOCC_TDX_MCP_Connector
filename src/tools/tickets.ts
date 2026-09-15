@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { TdxClient } from "../tdx-client.js";
 import { loadMaxResultsLimits } from "../config.js";
+import { filterByResponsibleUid } from "./ticket-filters.js";
 
 // Read-only ticket tools (always registered)
 export function registerTicketReadOnlyTools(server: McpServer, client: TdxClient) {
@@ -62,7 +63,7 @@ export function registerTicketReadOnlyTools(server: McpServer, client: TdxClient
       priorityIds: z.array(z.number()).optional().describe("Filter by priority IDs"),
       typeIds: z.array(z.number()).optional().describe("Filter by type IDs"),
       accountIds: z.array(z.number()).optional().describe("Filter by account IDs"),
-      responsibleUids: z.array(z.string()).optional().describe("Filter by responsible person UIDs"),
+      responsibleUids: z.array(z.string()).optional().describe("Filter by responsible person UIDs. Matches the ticket's own responsible person only (task-level responsibility does not count)"),
       responsibleGroupIds: z.array(z.number()).optional().describe("Filter by responsible group IDs"),
       requestorUids: z.array(z.string()).optional().describe("Filter by requestor UIDs (the person the ticket is FOR). Does NOT match tickets created on someone else's behalf - use createdByUid for that"),
       createdByUid: z.string().optional().describe("Filter by creator/author UID (the person who physically submitted/opened the ticket). Use this instead of requestorUids when searching for tickets a specific person created, since a person can create tickets on behalf of others"),
@@ -117,22 +118,28 @@ export function registerTicketReadOnlyTools(server: McpServer, client: TdxClient
       body.MaxResults = params.maxResults ?? defaultMaxResults;
       try {
         const result = await client.post(`/${app}/tickets/search`, body);
+        if (!Array.isArray(result)) {
+          return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+        }
+        const { tickets: matched } = filterByResponsibleUid(
+          result as Record<string, unknown>[],
+          params.responsibleUids
+        );
         // Trim to essential fields only
-        const trimmed = Array.isArray(result)
-          ? result.map((ticket) => ({
-              ID: ticket.ID,
-              FormattedNumber: ticket.FormattedNumber,
-              Title: ticket.Title,
-              StatusName: ticket.StatusName,
-              PriorityName: ticket.PriorityName,
-              CreatedDate: ticket.CreatedDate,
-              UpdatedDate: ticket.UpdatedDate,
-              ClosedDate: ticket.ClosedDate,
-              ResponsibleGroupName: ticket.ResponsibleGroupName,
-              RequestorFullName: ticket.RequestorFullName,
-              WebLink: client.getTicketWebLink((ticket as Record<string, unknown>).ID as number, app),
-            }))
-          : result;
+        const trimmed = matched.map((ticket) => ({
+          ID: ticket.ID,
+          FormattedNumber: ticket.FormattedNumber,
+          Title: ticket.Title,
+          StatusName: ticket.StatusName,
+          PriorityName: ticket.PriorityName,
+          CreatedDate: ticket.CreatedDate,
+          UpdatedDate: ticket.UpdatedDate,
+          ClosedDate: ticket.ClosedDate,
+          ResponsibleFullName: ticket.ResponsibleFullName,
+          ResponsibleGroupName: ticket.ResponsibleGroupName,
+          RequestorFullName: ticket.RequestorFullName,
+          WebLink: client.getTicketWebLink(ticket.ID as number, app),
+        }));
         return { content: [{ type: "text", text: JSON.stringify(trimmed, null, 2) }] };
       } catch (e: unknown) {
         return { content: [{ type: "text", text: String(e) }], isError: true };

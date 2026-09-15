@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { TdxClient } from "../tdx-client.js";
 import { loadMaxResultsLimits } from "../config.js";
+import { filterByResponsibleUid } from "./ticket-filters.js";
 
 // Ticket count tool (always registered)
 export function registerTicketCountTools(server: McpServer, client: TdxClient) {
@@ -10,7 +11,7 @@ export function registerTicketCountTools(server: McpServer, client: TdxClient) {
 
   server.tool(
     "tdx-ticket-count",
-    "Get count of TDX tickets matching filters with optional preview (returns count + up to 200 matching tickets). IMPORTANT: For ID-based filters (statusIds, priorityIds, accountIds, responsibleGroupIds), first use metadata lookup tools: tdx-statuses-get for statuses, tdx-account-search for accounts, tdx-group-search for groups, tdx-people-search for person UIDs.",
+    "Get count of TDX tickets matching filters, plus a preview of the matches. 'count' always reflects the full match set and is NOT limited by maxSummaryResults, which only controls how many tickets appear in the preview array. Check 'countIsExact' -- if false, the match set exceeded the server scan ceiling and 'count' is a floor. IMPORTANT: For ID-based filters (statusIds, priorityIds, accountIds, responsibleGroupIds), first use metadata lookup tools: tdx-statuses-get for statuses, tdx-account-search for accounts, tdx-group-search for groups, tdx-people-search for person UIDs.",
     {
       appId: z.number().optional().describe("TDX app ID (defaults to env TDX_APP_ID)"),
       searchText: z.string().optional().describe("Full-text search query"),
@@ -18,7 +19,7 @@ export function registerTicketCountTools(server: McpServer, client: TdxClient) {
       priorityIds: z.array(z.number()).optional().describe("Filter by priority IDs. Prioritization schemes depend on TDX configuration"),
       typeIds: z.array(z.number()).optional().describe("Filter by type IDs. Ticket types depend on TDX configuration"),
       accountIds: z.array(z.number()).optional().describe("Filter by account/department IDs. First call tdx-account-search to resolve department name to ID"),
-      responsibleUids: z.array(z.string()).optional().describe("Filter by responsible person UIDs. First call tdx-people-search to resolve person name to UID"),
+      responsibleUids: z.array(z.string()).optional().describe("Filter by responsible person UIDs. Matches the ticket's own responsible person only (task-level responsibility does not count). First call tdx-people-search to resolve person name to UID"),
       responsibleGroupIds: z.array(z.number()).optional().describe("Filter by responsible group IDs. First call tdx-group-search to resolve group name to ID"),
       requestorUids: z.array(z.string()).optional().describe("Filter by requestor UIDs (the person the ticket is FOR). Does NOT match tickets created on someone else's behalf - use createdByUid for that. First call tdx-people-search to resolve person name to UID"),
       createdByUid: z.string().optional().describe("Filter by creator/author UID (the person who physically submitted/opened the ticket). Use this instead of requestorUids when searching for tickets a specific person created, since a person can create tickets on behalf of others. First call tdx-people-search to resolve person name to UID"),
@@ -34,7 +35,7 @@ export function registerTicketCountTools(server: McpServer, client: TdxClient) {
       closedDateEnd: z.string().optional().describe("Filter by closed date end (ISO 8601 format)"),
       respondedDateStart: z.string().optional().describe("Filter by responded date start (ISO 8601 format)"),
       respondedDateEnd: z.string().optional().describe("Filter by responded date end (ISO 8601 format)"),
-      maxSummaryResults: z.number().optional().describe("Max tickets to include in response (default: 200)"),
+      maxSummaryResults: z.number().optional().describe("Max tickets to include in the preview array (default: 200). Does NOT affect the returned count"),
     },
     async (params) => {
       const app = params.appId ?? defaultAppId;
@@ -61,7 +62,7 @@ export function registerTicketCountTools(server: McpServer, client: TdxClient) {
       if (params.respondedDateStart !== undefined) body.RespondedDateFrom = params.respondedDateStart;
       if (params.respondedDateEnd !== undefined) body.RespondedDateTo = params.respondedDateEnd;
 
-      // Default maxResults for count tool based on environment
+      // Default preview size for the count tool based on environment.
       // Use same date filter detection as search tool for consistency
       const hasDateFilter = params.createdDateStart !== undefined || params.createdDateEnd !== undefined ||
                             params.modifiedDateStart !== undefined || params.modifiedDateEnd !== undefined ||
@@ -70,8 +71,12 @@ export function registerTicketCountTools(server: McpServer, client: TdxClient) {
                             params.closedDateStart !== undefined || params.closedDateEnd !== undefined ||
                             params.respondedDateStart !== undefined || params.respondedDateEnd !== undefined;
       const limits = loadMaxResultsLimits();
-      const defaultMaxResults = hasDateFilter ? limits.counts : Math.floor(limits.counts / 2);
-      body.MaxResults = params.maxSummaryResults ?? defaultMaxResults;
+      const previewLimit = params.maxSummaryResults ?? (hasDateFilter ? limits.counts : Math.floor(limits.counts / 2));
+
+      // The count must reflect every match, so the API request is capped by the scan
+      // ceiling rather than by how many tickets we echo back in the preview.
+      const scanLimit = limits.countScan;
+      body.MaxResults = scanLimit;
 
       try {
         const result = await client.post(`/${app}/tickets/search`, body);
@@ -88,9 +93,15 @@ export function registerTicketCountTools(server: McpServer, client: TdxClient) {
           };
         }
 
+        const scanTruncated = result.length >= scanLimit;
+        const { tickets: matched, applied: responsibleFilterApplied } = filterByResponsibleUid(
+          result as Record<string, unknown>[],
+          params.responsibleUids
+        );
+
         // Filter to essential fields only for preview (to reduce context window bloat)
         // Keep only fields needed by agent to understand ticket status and drill down
-        const previewTickets = result.map((ticket: Record<string, unknown>) => ({
+        const previewTickets = matched.slice(0, previewLimit).map((ticket: Record<string, unknown>) => ({
           ID: ticket.ID,
           Title: ticket.Title,
           StatusName: ticket.StatusName,
@@ -104,11 +115,18 @@ export function registerTicketCountTools(server: McpServer, client: TdxClient) {
           webLink: client.getTicketWebLink(ticket.ID as number, app),
         }));
 
-        // Return count + filtered preview tickets
-        const response = {
-          count: result.length,
+        const response: Record<string, unknown> = {
+          count: matched.length,
+          countIsExact: !scanTruncated,
+          previewCount: previewTickets.length,
           tickets: previewTickets,
         };
+        if (scanTruncated) {
+          response.note = `Match set hit the scan ceiling of ${scanLimit}; count is a floor, not an exact total. Narrow the filters or raise TDX_MAX_RESULTS_COUNT_SCAN.`;
+        }
+        if (params.responsibleUids !== undefined && !responsibleFilterApplied) {
+          response.responsibleFilterWarning = "TDX did not return ResponsibleUid on these results, so the responsibleUids filter could not be narrowed to ticket-level responsibility. Results may include tickets where the person is only task-responsible.";
+        }
 
         return { content: [{ type: "text", text: JSON.stringify(response, null, 2) }] };
       } catch (e: unknown) {

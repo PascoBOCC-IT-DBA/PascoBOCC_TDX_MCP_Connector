@@ -15,7 +15,8 @@ export interface TdxConfig {
 export interface MaxResultsLimits {
   withFilter: number;      // Max results when date filters present
   withoutFilter: number;   // Max results when no filters
-  counts: number;          // Max results for counts/preview
+  counts: number;          // Max tickets echoed back in the count tool's preview array
+  countScan: number;       // Max tickets the count tool asks TDX for when computing the count
 }
 
 /**
@@ -124,5 +125,8 @@ export function loadMaxResultsLimits(): MaxResultsLimits {
     withoutFilter: parseInt(process.env.TDX_MAX_RESULTS_WITHOUT_FILTER || '50', 10),
     // Counts tool: default 100 (down from 200)
     counts: parseInt(process.env.TDX_MAX_RESULTS_COUNTS || '100', 10),
+    // Counts tool scan ceiling: only ticket IDs are counted, so this can be far larger
+    // than the preview limit without risking a large MCP response.
+    countScan: parseInt(process.env.TDX_MAX_RESULTS_COUNT_SCAN || '10000', 10),
   };
 }
