@@ -1,8 +1,9 @@
 /**
- * TDX's ResponsibilityUids search parameter matches any responsibility association on a
- * ticket -- including task and assignment responsibility -- not just the ticket's own
- * responsible person. Callers asking "what is this person responsible for" get back
- * tickets owned by someone else, so narrow the result set to ticket-level matches here.
+ * Safety net for ticket-level responsibility. Searches now send TDX's
+ * PrimaryResponsibilityUids, but ResponsibilityUids (used when task responsibility is
+ * opted into) matches any responsibility association on a ticket -- including task and
+ * assignment responsibility -- so callers asking "what is this person responsible for"
+ * can get back tickets owned by someone else.
  */
 export function filterByResponsibleUid<T extends Record<string, unknown>>(
   tickets: T[],

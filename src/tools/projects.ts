@@ -6,7 +6,7 @@ import { loadMaxResultsLimits } from "../config.js";
 export function registerProjectReadOnlyTools(server: McpServer, client: TdxClient) {
   server.tool(
     "tdx-project-get",
-    "Get a TDX project by ID",
+    "Get a record from the TDX Projects module by ID. WARNING: this module is nearly empty in this organization. IT project work is tracked as TICKETS of type 'Projects - IT', not here. For 'what projects is <person> working on / responsible for', use tdx-ticket-search instead (resolve the type via tdx-ticket-types-get with name 'Projects', then pass typeIds + responsibleUids).",
     {
       id: z.number().describe("Project ID"),
     },
@@ -22,13 +22,13 @@ export function registerProjectReadOnlyTools(server: McpServer, client: TdxClien
 
   server.tool(
     "tdx-project-search",
-    "Search TDX projects with filters",
+    "Search the TDX Projects module. WARNING: this module is nearly empty in this organization and is almost never the right tool. IT project work is tracked as TICKETS of type 'Projects - IT'. For questions like 'what projects is <person> responsible for / assigned to / managing', use tdx-ticket-search: call tdx-ticket-types-get with name 'Projects' to get the type ID, then search with typeIds + responsibleUids. Only use this tool when the user explicitly means TDX Projects/portfolios/project plans.",
     {
       searchText: z.string().optional().describe("Full-text search query"),
       statusIds: z.array(z.number()).optional().describe("Filter by status IDs"),
       priorityIds: z.array(z.number()).optional().describe("Filter by priority IDs"),
       accountIds: z.array(z.number()).optional().describe("Filter by account IDs"),
-      managerUids: z.array(z.string()).optional().describe("Filter by project manager UIDs"),
+      managerUids: z.array(z.string()).optional().describe("Filter by project manager UIDs. This is the project's AdminUID (project manager), NOT ticket responsibility"),
       isActive: z.boolean().optional().describe("Filter by active status"),
       createdDateStart: z.string().optional().describe("Filter by created date start (ISO 8601)"),
       createdDateEnd: z.string().optional().describe("Filter by created date end (ISO 8601)"),

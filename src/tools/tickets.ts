@@ -19,7 +19,7 @@ export function registerTicketReadOnlyTools(server: McpServer, client: TdxClient
       {
         appId: z.number().optional().describe("TDX app ID (defaults to env TDX_APP_ID)"),
         id: z.number().describe("Ticket ID"),
-        detailLevel: z.enum(["summary", "full"]).optional().describe("'summary' (default) returns 11 essential fields; 'full' returns the complete raw ticket record with all fields"),
+        detailLevel: z.enum(["summary", "full"]).optional().describe("'summary' (default) returns essential fields, including ResponsibleUid/ResponsibleFullName and ResponsibleGroupID/ResponsibleGroupName; 'full' returns the complete raw ticket record with all fields"),
       },
       async (params) => {
         const app = params.appId ?? defaultAppId;
@@ -38,6 +38,9 @@ export function registerTicketReadOnlyTools(server: McpServer, client: TdxClient
             CreatedDate: ticket.CreatedDate,
             UpdatedDate: ticket.UpdatedDate,
             ClosedDate: ticket.ClosedDate,
+            ResponsibleUid: ticket.ResponsibleUid,
+            ResponsibleFullName: ticket.ResponsibleFullName,
+            ResponsibleGroupID: ticket.ResponsibleGroupID,
             ResponsibleGroupName: ticket.ResponsibleGroupName,
             RequestorFullName: ticket.RequestorFullName,
             WebLink: client.getTicketWebLink(params.id, app),
@@ -55,16 +58,17 @@ export function registerTicketReadOnlyTools(server: McpServer, client: TdxClient
 
   server.tool(
     "tdx-ticket-search",
-    "Search TDX tickets with filters. Always returns trimmed summaries (11 essential fields + WebLink) to control response size, even for a single matching ticket - this is not configurable for search since result sets can be large. To get full ticket detail (description, custom attributes, contacts, applications, approvals, etc.) for a specific ticket found here, call tdx-ticket-get with that ticket's ID and detailLevel: 'full'.",
+    "Search TDX tickets with filters. Always returns trimmed summaries (essential fields + WebLink) to control response size, even for a single matching ticket - this is not configurable for search since result sets can be large. Each result carries both ResponsibleUid and ResponsibleFullName (plus ResponsibleGroupID/ResponsibleGroupName), so assignment can be confirmed by UID without a second lookup. To get full ticket detail (description, custom attributes, contacts, applications, approvals, etc.) for a specific ticket found here, call tdx-ticket-get with that ticket's ID and detailLevel: 'full'.",
     {
       appId: z.number().optional().describe("TDX app ID (defaults to env TDX_APP_ID)"),
       searchText: z.string().optional().describe("Full-text search query"),
       statusIds: z.array(z.number()).optional().describe("Filter by status IDs"),
       priorityIds: z.array(z.number()).optional().describe("Filter by priority IDs"),
-      typeIds: z.array(z.number()).optional().describe("Filter by type IDs. First call tdx-ticket-types-get to resolve a type name (e.g., 'Incident') to its ID"),
+      typeIds: z.array(z.number()).optional().describe("Filter by type IDs. First call tdx-ticket-types-get to resolve a type name to its ID. NOTE: IT projects are tickets of type 'Projects - IT' - use this filter (not tdx-project-search) to answer 'what projects is <person> responsible for'"),
       accountIds: z.array(z.number()).optional().describe("Filter by account IDs"),
-      responsibleUids: z.array(z.string()).optional().describe("Filter by responsible person UIDs. Matches the ticket's own responsible person only (task-level responsibility does not count)"),
-      responsibleGroupIds: z.array(z.number()).optional().describe("Filter by responsible group IDs"),
+      responsibleUids: z.array(z.string()).optional().describe("Filter by responsible person UIDs. Matches the ticket's own 'Primary Responsible' person only (task-level responsibility does not count) unless includeTaskResponsibility is true"),
+      responsibleGroupIds: z.array(z.number()).optional().describe("Filter by responsible group IDs. Matches the ticket's own primary responsible group unless includeTaskResponsibility is true"),
+      includeTaskResponsibility: z.boolean().optional().describe("When true, responsibleUids/responsibleGroupIds also match tickets where the person or group is only responsible for a ticket TASK, not the ticket itself. Default false ('what is this person responsible for')"),
       requestorUids: z.array(z.string()).optional().describe("Filter by requestor UIDs (the person the ticket is FOR). Does NOT match tickets created on someone else's behalf - use createdByUid for that"),
       createdByUid: z.string().optional().describe("Filter by creator/author UID (the person who physically submitted/opened the ticket). Use this instead of requestorUids when searching for tickets a specific person created, since a person can create tickets on behalf of others"),
       createdDateStart: z.string().optional().describe("Filter by creation date start (ISO 8601 format)"),
@@ -89,8 +93,13 @@ export function registerTicketReadOnlyTools(server: McpServer, client: TdxClient
       if (params.priorityIds !== undefined) body.PriorityIDs = params.priorityIds;
       if (params.typeIds !== undefined) body.TypeIDs = params.typeIds;
       if (params.accountIds !== undefined) body.AccountIDs = params.accountIds;
-      if (params.responsibleUids !== undefined) body.ResponsibilityUids = params.responsibleUids;
-      if (params.responsibleGroupIds !== undefined) body.ResponsibilityGroupIDs = params.responsibleGroupIds;
+      const includeTaskResponsibility = params.includeTaskResponsibility === true;
+      if (params.responsibleUids !== undefined) {
+        body[includeTaskResponsibility ? "ResponsibilityUids" : "PrimaryResponsibilityUids"] = params.responsibleUids;
+      }
+      if (params.responsibleGroupIds !== undefined) {
+        body[includeTaskResponsibility ? "ResponsibilityGroupIDs" : "PrimaryResponsibilityGroupIDs"] = params.responsibleGroupIds;
+      }
       if (params.requestorUids !== undefined) body.RequestorUids = params.requestorUids;
       if (params.createdByUid !== undefined) body.CreatedByUid = params.createdByUid;
       if (params.createdDateStart !== undefined) body.CreatedDateFrom = params.createdDateStart;
@@ -123,7 +132,7 @@ export function registerTicketReadOnlyTools(server: McpServer, client: TdxClient
         }
         const { tickets: matched } = filterByResponsibleUid(
           result as Record<string, unknown>[],
-          params.responsibleUids
+          includeTaskResponsibility ? undefined : params.responsibleUids
         );
         // Trim to essential fields only
         const trimmed = matched.map((ticket) => ({
@@ -135,7 +144,9 @@ export function registerTicketReadOnlyTools(server: McpServer, client: TdxClient
           CreatedDate: ticket.CreatedDate,
           UpdatedDate: ticket.UpdatedDate,
           ClosedDate: ticket.ClosedDate,
+          ResponsibleUid: ticket.ResponsibleUid,
           ResponsibleFullName: ticket.ResponsibleFullName,
+          ResponsibleGroupID: ticket.ResponsibleGroupID,
           ResponsibleGroupName: ticket.ResponsibleGroupName,
           RequestorFullName: ticket.RequestorFullName,
           WebLink: client.getTicketWebLink(ticket.ID as number, app),

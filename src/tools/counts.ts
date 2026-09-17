@@ -17,10 +17,11 @@ export function registerTicketCountTools(server: McpServer, client: TdxClient) {
       searchText: z.string().optional().describe("Full-text search query"),
       statusIds: z.array(z.number()).optional().describe("Filter by status IDs. First call tdx-statuses-get (componentType: 'tickets') to resolve status name (e.g., 'Open') to ID"),
       priorityIds: z.array(z.number()).optional().describe("Filter by priority IDs. Prioritization schemes depend on TDX configuration"),
-      typeIds: z.array(z.number()).optional().describe("Filter by type IDs. First call tdx-ticket-types-get to resolve a type name (e.g., 'Incident') to its ID"),
+      typeIds: z.array(z.number()).optional().describe("Filter by type IDs. First call tdx-ticket-types-get to resolve a type name to its ID. NOTE: IT projects are tickets of type 'Projects - IT' - use this filter (not tdx-project-search) to count a person's projects"),
       accountIds: z.array(z.number()).optional().describe("Filter by account/department IDs. First call tdx-account-search to resolve department name to ID"),
-      responsibleUids: z.array(z.string()).optional().describe("Filter by responsible person UIDs. Matches the ticket's own responsible person only (task-level responsibility does not count). First call tdx-people-search to resolve person name to UID"),
-      responsibleGroupIds: z.array(z.number()).optional().describe("Filter by responsible group IDs. First call tdx-group-search to resolve group name to ID"),
+      responsibleUids: z.array(z.string()).optional().describe("Filter by responsible person UIDs. Matches the ticket's own 'Primary Responsible' person only (task-level responsibility does not count) unless includeTaskResponsibility is true. First call tdx-people-search to resolve person name to UID"),
+      responsibleGroupIds: z.array(z.number()).optional().describe("Filter by responsible group IDs. Matches the ticket's own primary responsible group unless includeTaskResponsibility is true. First call tdx-group-search to resolve group name to ID"),
+      includeTaskResponsibility: z.boolean().optional().describe("When true, responsibleUids/responsibleGroupIds also match tickets where the person or group is only responsible for a ticket TASK, not the ticket itself. Default false ('what is this person responsible for')"),
       requestorUids: z.array(z.string()).optional().describe("Filter by requestor UIDs (the person the ticket is FOR). Does NOT match tickets created on someone else's behalf - use createdByUid for that. First call tdx-people-search to resolve person name to UID"),
       createdByUid: z.string().optional().describe("Filter by creator/author UID (the person who physically submitted/opened the ticket). Use this instead of requestorUids when searching for tickets a specific person created, since a person can create tickets on behalf of others. First call tdx-people-search to resolve person name to UID"),
       createdDateStart: z.string().optional().describe("Filter by creation date start (ISO 8601 format)"),
@@ -45,8 +46,13 @@ export function registerTicketCountTools(server: McpServer, client: TdxClient) {
       if (params.priorityIds !== undefined) body.PriorityIDs = params.priorityIds;
       if (params.typeIds !== undefined) body.TypeIDs = params.typeIds;
       if (params.accountIds !== undefined) body.AccountIDs = params.accountIds;
-      if (params.responsibleUids !== undefined) body.ResponsibilityUids = params.responsibleUids;
-      if (params.responsibleGroupIds !== undefined) body.ResponsibilityGroupIDs = params.responsibleGroupIds;
+      const includeTaskResponsibility = params.includeTaskResponsibility === true;
+      if (params.responsibleUids !== undefined) {
+        body[includeTaskResponsibility ? "ResponsibilityUids" : "PrimaryResponsibilityUids"] = params.responsibleUids;
+      }
+      if (params.responsibleGroupIds !== undefined) {
+        body[includeTaskResponsibility ? "ResponsibilityGroupIDs" : "PrimaryResponsibilityGroupIDs"] = params.responsibleGroupIds;
+      }
       if (params.requestorUids !== undefined) body.RequestorUids = params.requestorUids;
       if (params.createdByUid !== undefined) body.CreatedByUid = params.createdByUid;
       if (params.createdDateStart !== undefined) body.CreatedDateFrom = params.createdDateStart;
@@ -96,7 +102,7 @@ export function registerTicketCountTools(server: McpServer, client: TdxClient) {
         const scanTruncated = result.length >= scanLimit;
         const { tickets: matched, applied: responsibleFilterApplied } = filterByResponsibleUid(
           result as Record<string, unknown>[],
-          params.responsibleUids
+          includeTaskResponsibility ? undefined : params.responsibleUids
         );
 
         // Filter to essential fields only for preview (to reduce context window bloat)
@@ -108,7 +114,9 @@ export function registerTicketCountTools(server: McpServer, client: TdxClient) {
           PriorityName: ticket.PriorityName,
           CreatedDate: ticket.CreatedDate,
           CreatedFullName: ticket.CreatedFullName,
+          ResponsibleUid: ticket.ResponsibleUid,
           ResponsibleFullName: ticket.ResponsibleFullName,
+          ResponsibleGroupID: ticket.ResponsibleGroupID,
           ResponsibleGroupName: ticket.ResponsibleGroupName,
           RequestorName: ticket.RequestorName,
           AccountName: ticket.AccountName,
@@ -124,7 +132,7 @@ export function registerTicketCountTools(server: McpServer, client: TdxClient) {
         if (scanTruncated) {
           response.note = `Match set hit the scan ceiling of ${scanLimit}; count is a floor, not an exact total. Narrow the filters or raise TDX_MAX_RESULTS_COUNT_SCAN.`;
         }
-        if (params.responsibleUids !== undefined && !responsibleFilterApplied) {
+        if (params.responsibleUids !== undefined && !includeTaskResponsibility && !responsibleFilterApplied) {
           response.responsibleFilterWarning = "TDX did not return ResponsibleUid on these results, so the responsibleUids filter could not be narrowed to ticket-level responsibility. Results may include tickets where the person is only task-responsible.";
         }
 

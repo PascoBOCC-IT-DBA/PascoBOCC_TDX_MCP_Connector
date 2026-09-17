@@ -37,8 +37,9 @@ Searches and filters TeamDynamix tickets. All filters combine with AND logic.
 - `accountIds` (integer[], optional) - Filter by account/department IDs
 - `requestorUids` (string[], optional) - Filter by requestor person UIDs (the person the ticket is FOR, not necessarily who submitted it)
 - `createdByUid` (string, optional) - Filter by creator/author UID (the person who physically submitted/opened the ticket). Use this instead of `requestorUids` when searching for tickets a person **created**, since a person can create a ticket on behalf of someone else (in which case `requestorUids` would not match)
-- `responsibleUids` (string[], optional) - Filter by responsible person UIDs. Matches the ticket's own responsible person only. TDX's underlying `ResponsibilityUids` parameter also matches task-level responsibility, so the server post-filters results on the ticket's `ResponsibleUid`
-- `responsibleGroupIds` (integer[], optional) - Filter by responsible group IDs
+- `responsibleUids` (string[], optional) - Filter by responsible person UIDs. Sent to TDX as `PrimaryResponsibilityUids`, which matches the ticket's own "Primary Responsible" person. TDX's `ResponsibilityUids` parameter also matches task-level responsibility, so it is only used when `includeTaskResponsibility` is true; results are additionally post-filtered on the ticket's `ResponsibleUid` as a safety net
+- `responsibleGroupIds` (integer[], optional) - Filter by responsible group IDs. Sent as `PrimaryResponsibilityGroupIDs` unless `includeTaskResponsibility` is true
+- `includeTaskResponsibility` (boolean, optional) - When true, `responsibleUids`/`responsibleGroupIds` also match tickets where the person or group is only responsible for a ticket **task**. Default false
 - `createdDateStart` (string, optional) - Filter by creation date start (ISO 8601 format)
 - `createdDateEnd` (string, optional) - Filter by creation date end (ISO 8601 format)
 - `modifiedDateStart` (string, optional) - Filter by modification date start (ISO 8601 format)
@@ -108,7 +109,8 @@ All parameters match `tdx-ticket-search`:
 - `accountIds` (integer[], optional) - Filter by account/department IDs
 - `requestorUids` (string[], optional) - Filter by requestor person UIDs (the person the ticket is FOR, not necessarily who submitted it)
 - `createdByUid` (string, optional) - Filter by creator/author UID (the person who physically submitted/opened the ticket). Use this instead of `requestorUids` when counting tickets a person **created**, since a person can create a ticket on behalf of someone else
-- `responsibleUids` (string[], optional) - Filter by responsible person UIDs. Matches the ticket's own responsible person only (see note under `tdx-ticket-search`)
+- `responsibleUids` (string[], optional) - Filter by responsible person UIDs. Matches the ticket's own primary responsible person only (see note under `tdx-ticket-search`)
+- `includeTaskResponsibility` (boolean, optional) - When true, also match task-level responsibility. Default false
 - `responsibleGroupIds` (integer[], optional) - Filter by responsible group IDs
 - `createdDateStart` (string, optional) - Filter by creation date start (ISO 8601 format)
 - `createdDateEnd` (string, optional) - Filter by creation date end (ISO 8601 format)
