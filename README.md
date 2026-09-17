@@ -2,7 +2,7 @@
 
 A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that wraps the [TeamDynamix (TDX) REST API](https://solutions.teamdynamix.com/TDWebApi/), enabling AI-assisted IT service management through MCP-compatible AI clients, including GitHub Copilot Chat.
 
-This server exposes **43 tools** across **10 domains** — tickets, assets, CMDB, knowledge base, people, projects, accounts, groups, statuses, and custom attributes — allowing natural language interaction with your TDX instance.
+This server exposes **44 tools** across **11 domains** — tickets, ticket types, assets, CMDB, knowledge base, people, projects, accounts, groups, statuses, and custom attributes — allowing natural language interaction with your TDX instance.
 
 ## Quick Start
 
@@ -71,7 +71,7 @@ This design prevents accidental data changes when the server is first deployed. 
 
 ### Tool Organization
 
-All 43 tools are organized into **10 domains**, each with a separate registration module:
+All 44 tools are organized into **11 domains**, each with a separate registration module:
 
 - **Tickets** (`src/tools/tickets.ts`) — 9 tools: ticket management, comments, and asset linking
 - **Assets** (`src/tools/assets.ts`) — 8 tools: asset lifecycle, search, and categories
@@ -82,6 +82,7 @@ All 43 tools are organized into **10 domains**, each with a separate registratio
 - **Accounts** (`src/tools/accounts.ts`) — 2 tools: account/department lookups
 - **Groups** (`src/tools/groups.ts`) — 2 tools: group lookups
 - **Statuses** (`src/tools/statuses.ts`) — 1 tool: status definitions
+- **Ticket Types** (`src/tools/ticket-types.ts`) — 1 tool: ticket type lookups
 - **Attributes** (`src/tools/attributes.ts`) — 1 tool: custom attribute definitions
 
 ### Safety-by-Default Registration Pattern
@@ -211,6 +212,12 @@ These tools do not require an `appId`.
 |------|--------------|--------|----------|-------------|
 | `tdx-statuses-get` | 🔒 | GET | `/{componentType}/statuses` | Get available statuses for a component type (tickets, assets, projects, cmdb, knowledgebase) |
 
+### Ticket Types (1 tool: read-only only)
+
+| Tool | Availability | Method | Endpoint | Description |
+|------|--------------|--------|----------|-------------|
+| `tdx-ticket-types-get` | 🔒 | GET | `/{appId}/tickets/types` and `/{appId}/tickets/types/{id}` | List ticket types, fetch one by ID, or filter by name substring — resolves type names to the IDs used by the `typeIds` filter |
+
 ### Custom Attributes (1 tool: read-only only)
 
 | Tool | Availability | Method | Endpoint | Description |
@@ -231,7 +238,7 @@ For deployment instructions, see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
 |----------|---------|
 | **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** | Complete Azure App Service deployment guide (prerequisites, workflow, troubleshooting) |
 | **[docs/KEYVAULT_SECRETS_SETUP.md](docs/KEYVAULT_SECRETS_SETUP.md)** | Azure Key Vault secrets configuration (required for all deployments) |
-| **[docs/TOOLS_REFERENCE.md](docs/TOOLS_REFERENCE.md)** | Complete reference for all 43 tools with parameters, return structures, and usage examples |
+| **[docs/TOOLS_REFERENCE.md](docs/TOOLS_REFERENCE.md)** | Complete reference for all 44 tools with parameters, return structures, and usage examples |
 | **[docs/API_REFERENCE.md](docs/API_REFERENCE.md)** | TDX API endpoints, authentication, and technical reference |
 
 For complete tool documentation, see [docs/TOOLS_REFERENCE.md](docs/TOOLS_REFERENCE.md).
@@ -275,6 +282,7 @@ PascoBOCC_TDX_MCP_Connector/
       accounts.ts          # 2 account tools
       groups.ts            # 2 group tools
       statuses.ts          # 1 status tool
+      ticket-types.ts      # 1 ticket type lookup tool
       attributes.ts        # 1 custom attributes tool
   docs/
     DEPLOYMENT.md          # Azure App Service deployment guide

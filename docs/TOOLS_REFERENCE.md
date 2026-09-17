@@ -1,6 +1,6 @@
 # TeamDynamix MCP Server - Tools Reference
 
-**Total Tools:** 44 tools across 10 categories  
+**Total Tools:** 45 tools across 11 categories  
 **Modification Status:** Modification tools (create, update, delete) are DISABLED by default. Enable via `ALLOW_MODIFICATIONS=true` environment variable only in authorized environments.
 
 ---
@@ -16,6 +16,7 @@
 - [Accounts (2 tools)](#accounts)
 - [Groups (2 tools)](#groups)
 - [Statuses (1 tool)](#statuses)
+- [Ticket Types (1 tool)](#ticket-types)
 - [Custom Attributes (1 tool)](#custom-attributes)
 
 ---
@@ -1296,6 +1297,38 @@ Retrieves available statuses for a specific TDX component type.
 ```
 
 **Notes:** Use this tool to discover valid `statusIds` for filtering and creating items. Status IDs are required for many search and creation operations.
+
+---
+
+# TICKET TYPES
+
+## tdx-ticket-types-get
+**Status:** ✅ ENABLED  
+**Type:** Read-only / Metadata
+
+Looks up ticket types for a ticketing application. Call with no parameters to list all types, with `id` to fetch one type, or with `name` to filter the list by a case-insensitive name substring.
+
+**Parameters:**
+- `id` (integer, optional) - Fetch a single ticket type by its ID
+- `name` (string, optional) - Case-insensitive substring filter on the type name (ignored when `id` is supplied)
+- `appId` (integer, optional) - Application ID (defaults to `TDX_APP_ID`)
+
+**Returns:** Array of ticket type objects (or a single object when `id` is supplied). Example:
+```json
+{
+  "ID": 3252,
+  "AppID": 115,
+  "AppName": "IT Tickets",
+  "CategoryID": 412,
+  "CategoryName": "Support",
+  "FullName": "Support / Incident",
+  "Name": "Incident",
+  "Description": "",
+  "IsActive": true
+}
+```
+
+**Notes:** Use this tool to resolve a ticket type name to the numeric ID required by the `typeIds` filter on `tdx-ticket-search` and `tdx-ticket-count`.
 
 ---
 

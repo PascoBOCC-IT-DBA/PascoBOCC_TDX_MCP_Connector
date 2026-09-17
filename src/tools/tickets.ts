@@ -61,7 +61,7 @@ export function registerTicketReadOnlyTools(server: McpServer, client: TdxClient
       searchText: z.string().optional().describe("Full-text search query"),
       statusIds: z.array(z.number()).optional().describe("Filter by status IDs"),
       priorityIds: z.array(z.number()).optional().describe("Filter by priority IDs"),
-      typeIds: z.array(z.number()).optional().describe("Filter by type IDs"),
+      typeIds: z.array(z.number()).optional().describe("Filter by type IDs. First call tdx-ticket-types-get to resolve a type name (e.g., 'Incident') to its ID"),
       accountIds: z.array(z.number()).optional().describe("Filter by account IDs"),
       responsibleUids: z.array(z.string()).optional().describe("Filter by responsible person UIDs. Matches the ticket's own responsible person only (task-level responsibility does not count)"),
       responsibleGroupIds: z.array(z.number()).optional().describe("Filter by responsible group IDs"),

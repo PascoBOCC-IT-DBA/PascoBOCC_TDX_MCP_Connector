@@ -15,6 +15,7 @@ import { registerAccountTools } from "./tools/accounts.js";
 import { registerGroupTools } from "./tools/groups.js";
 import { registerAttributeTools } from "./tools/attributes.js";
 import { registerStatusTools } from "./tools/statuses.js";
+import { registerTicketTypeTools } from "./tools/ticket-types.js";
 
 // Global error handlers to catch startup errors
 process.on('uncaughtException', (err) => {
@@ -132,6 +133,7 @@ process.on('unhandledRejection', (reason, promise) => {
     registerGroupTools(server, client);
     registerAttributeTools(server, client);
     registerStatusTools(server, client);
+    registerTicketTypeTools(server, client);
     console.error("[TDX-MCP] All tool registrations complete, creating transport...");
 
     const transport = new StdioServerTransport();
