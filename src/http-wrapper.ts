@@ -371,7 +371,7 @@ function ensureStdoutListener() {
 }
 
 // Handle MCP JSON-RPC requests
-async function handleMcpRequest(message, res) {
+async function handleMcpRequest(message, res, keyAccessLevel?: AccessLevel | null) {
   const hasMessageId = Object.prototype.hasOwnProperty.call(message, 'id');
   const isNotification = !hasMessageId; // Notifications don't have an ID in JSON-RPC 2.0
   const methodName = message.method || 'unknown';
@@ -433,6 +433,14 @@ async function handleMcpRequest(message, res) {
 
   promise.then((mcpResponse) => {
     if (!res.headersSent) {
+      // Filter tool list by API key access level, so a read-only key never sees write tools
+      if (methodName === 'tools/list' && keyAccessLevel && mcpResponse?.result?.tools) {
+        const originalCount = mcpResponse.result.tools.length;
+        mcpResponse.result.tools = mcpResponse.result.tools.filter((tool: any) =>
+          canAccessTool(tool.name, keyAccessLevel)
+        );
+        console.log(`[Handler] tools/list: Filtered ${originalCount} tools to ${mcpResponse.result.tools.length} for ${keyAccessLevel} key`);
+      }
       // Return raw MCP JSON-RPC response without wrapping
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(mcpResponse));
@@ -631,7 +639,7 @@ const server = http.createServer((req, res) => {
         }
 
         // Call async handler
-        handleMcpRequest(message, res).catch((err) => {
+        handleMcpRequest(message, res, keyAccessLevel).catch((err) => {
           console.error(`[HTTP] Unhandled error in handleMcpRequest: ${err}`);
           if (!res.headersSent) {
             res.writeHead(500, { 'Content-Type': 'application/json' });
