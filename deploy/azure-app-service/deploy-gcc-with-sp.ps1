@@ -107,7 +107,8 @@ $RequiredSecrets = @(
     "TdxAppId",
     "TdxAssetsAppId",
     "TdxKbAppId",
-    "McpApiKey"
+    "McpApiKeyReadonly",
+    "McpApiKeyReadwrite"
 )
 
 Write-Host "`n╔════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
@@ -351,9 +352,10 @@ try {
             WEBSITES_PORT                           = "3000"
             SCM_DO_BUILD_DURING_DEPLOYMENT          = "false"
             NODE_ENV                                = "production"
-            ALLOW_MODIFICATIONS                     = "false"
             WEBSITE_NODE_DEFAULT_VERSION            = "24-lts"
             KEYVAULT_URL                            = $keyVaultUri
+            MCP_API_KEY_READONLY                    = "@Microsoft.KeyVault(SecretUri=${keyVaultUri}secrets/McpApiKeyReadonly/)"
+            MCP_API_KEY_READWRITE                   = "@Microsoft.KeyVault(SecretUri=${keyVaultUri}secrets/McpApiKeyReadwrite/)"
             TDX_RATE_LIMIT_ENABLED                  = "true"
             TDX_RATE_LIMIT_CALLS                    = "60"
             TDX_RATE_LIMIT_WINDOW_MS                = "60000"

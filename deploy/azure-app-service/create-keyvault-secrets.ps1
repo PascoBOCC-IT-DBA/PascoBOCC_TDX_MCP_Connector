@@ -118,7 +118,8 @@ $RequiredSecrets = @(
     @{ Name = "TdxAppId"; Description = "Main application ID" },
     @{ Name = "TdxAssetsAppId"; Description = "Assets application ID" },
     @{ Name = "TdxKbAppId"; Description = "Knowledge Base application ID" },
-    @{ Name = "McpApiKey"; Description = "API key for MCP Server access"; Sensitive = $true }
+    @{ Name = "McpApiKeyReadonly"; Description = "MCP API key for read-only access"; Sensitive = $true },
+    @{ Name = "McpApiKeyReadwrite"; Description = "MCP API key for read-write access"; Sensitive = $true }
 )
 
 # Optional secrets

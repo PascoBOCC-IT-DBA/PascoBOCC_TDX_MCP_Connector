@@ -13,8 +13,8 @@ import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import dotenv from 'dotenv';
-import { RateLimiter } from './rate-limiter.js';
 import { loadRateLimiterConfig } from './rate-limit-config.js';
+import { canAccessTool, getToolAccessLevel, type AccessLevel } from './tool-access-config.js';
 
 type JsonRpcId = string | number;
 
@@ -25,7 +25,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const PORT = process.env.PORT || process.env.MCP_HTTP_PORT || 3000;
-const API_KEY = process.env.MCP_API_KEY || null;
+const API_KEY_READONLY = process.env.MCP_API_KEY_READONLY || null;
+const API_KEY_READWRITE = process.env.MCP_API_KEY_READWRITE || null;
 const ALLOW_UNAUTH_INITIALIZE = process.env.MCP_ALLOW_UNAUTH_INITIALIZE === 'true';
 // When running from dist/http-wrapper.js, index.js is in the same directory
 const MCPscriptPath = join(__dirname, 'index.js');
@@ -38,7 +39,8 @@ const TOOLS_CALL_TIMEOUT_MS = parseInt(process.env.MCP_TOOLS_CALL_TIMEOUT_MS || 
 
 console.log(`[Startup] HTTP Wrapper initializing...`);
 console.log(`[Startup] PORT: ${PORT}`);
-console.log(`[Startup] API_KEY: ${API_KEY ? 'configured' : 'not configured'}`);
+console.log(`[Startup] API_KEY_READONLY: ${API_KEY_READONLY ? 'configured' : 'not configured'}`);
+console.log(`[Startup] API_KEY_READWRITE: ${API_KEY_READWRITE ? 'configured' : 'not configured'}`);
 console.log(`[Startup] Allow Unauthenticated Initialize: ${ALLOW_UNAUTH_INITIALIZE ? 'enabled' : 'disabled'}`);
 console.log(`[Startup] MCP Script: ${MCPscriptPath}`);
 console.log(`[Startup] Request Timeout (default): ${REQUEST_TIMEOUT_MS}ms`);
@@ -125,6 +127,24 @@ function getProvidedApiKey(req: http.IncomingMessage): string {
   }
 
   return '';
+}
+
+/**
+ * Determine the access level of a provided API key
+ * Returns 'readwrite', 'readonly', or null if key is invalid
+ */
+function getApiKeyAccessLevel(providedKey: string): AccessLevel | null {
+  if (!providedKey) return null;
+  
+  if (API_KEY_READWRITE && providedKey === API_KEY_READWRITE) {
+    return 'readwrite';
+  }
+  
+  if (API_KEY_READONLY && providedKey === API_KEY_READONLY) {
+    return 'readonly';
+  }
+  
+  return null;
 }
 
 function isNotificationMessage(message: any): boolean {
@@ -237,7 +257,6 @@ function getOrCreateMCPProcess() {
     env: {
       ...process.env,
       NODE_ENV: 'production',
-      ALLOW_MODIFICATIONS: process.env.ALLOW_MODIFICATIONS || 'false',
       TDX_BASE_URL: process.env.TDX_BASE_URL,
       TDX_BEID: process.env.TDX_BEID,
       TDX_WEB_SERVICES_KEY: process.env.TDX_WEB_SERVICES_KEY,
@@ -475,9 +494,12 @@ const server = http.createServer((req, res) => {
   const isPublicEndpoint = req.url === '/health' || req.url === '/tools' || req.url === '/status';
 
   // API Key authentication for non-MCP routes
-  if (API_KEY && !isPublicEndpoint && req.url !== '/' && req.url !== '/mcp' && req.url !== '/mcp/') {
+  // Only enforce if at least one API key is configured
+  const anyApiKeyConfigured = API_KEY_READONLY || API_KEY_READWRITE;
+  if (anyApiKeyConfigured && !isPublicEndpoint && req.url !== '/' && req.url !== '/mcp' && req.url !== '/mcp/') {
     const providedKey = getProvidedApiKey(req);
-    if (!providedKey || providedKey !== API_KEY) {
+    const keyAccessLevel = getApiKeyAccessLevel(providedKey);
+    if (!keyAccessLevel) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Unauthorized' }));
       return;
@@ -503,8 +525,20 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Tools list - query MCP subprocess dynamically so ALLOW_MODIFICATIONS is respected
+  // Tools list endpoint - returns available tools filtered by API key access level
   if (req.url === '/tools' && req.method === 'GET') {
+    // Get API key access level for filtering
+    const providedKey = getProvidedApiKey(req);
+    const keyAccessLevel = getApiKeyAccessLevel(providedKey);
+    
+    // Check if API keys are configured and if the provided key is valid
+    const anyApiKeyConfigured = API_KEY_READONLY || API_KEY_READWRITE;
+    if (anyApiKeyConfigured && !keyAccessLevel) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Unauthorized - Invalid or missing API key' }));
+      return;
+    }
+    
     const toolsListMessage = { jsonrpc: '2.0', id: `tools-list-${Date.now()}`, method: 'tools/list', params: {} };
     let savedStatus = 200;
     let responded = false;
@@ -519,7 +553,16 @@ const server = http.createServer((req, res) => {
             const parsed = JSON.parse(body);
             // Return full tool objects with descriptions and input schemas (not just names)
             // This is required for Copilot agents to properly enumerate and use tools
-            const tools = parsed?.result?.tools ?? [];
+            let tools = parsed?.result?.tools ?? [];
+            
+            // Filter tools based on API key access level if applicable
+            if (keyAccessLevel) {
+              tools = tools.filter((tool: any) => {
+                return canAccessTool(tool.name, keyAccessLevel);
+              });
+              console.log(`[HTTP] /tools: Filtered ${parsed?.result?.tools?.length ?? 0} tools to ${tools.length} for ${keyAccessLevel} key`);
+            }
+            
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ tools }));
             return;
@@ -557,16 +600,33 @@ const server = http.createServer((req, res) => {
         const message = JSON.parse(body);
 
         // API Key authentication for MCP endpoint with optional compatibility bypass
-        if (API_KEY) {
+        const anyApiKeyConfigured = API_KEY_READONLY || API_KEY_READWRITE;
+        let keyAccessLevel: AccessLevel | null = null;
+        
+        if (anyApiKeyConfigured) {
           const providedKey = getProvidedApiKey(req);
+          keyAccessLevel = getApiKeyAccessLevel(providedKey);
 
-          if (!providedKey || providedKey !== API_KEY) {
+          if (!keyAccessLevel) {
             if (!isAllowedWithoutAuthInCompatibilityMode(message)) {
               res.writeHead(401, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ error: 'Unauthorized' }));
               return;
             }
             console.warn('[Auth] Allowing unauthenticated MCP compatibility request due to MCP_ALLOW_UNAUTH_INITIALIZE=true');
+          }
+        }
+
+        // Validate tool access for tools/call requests
+        if (message.method === 'tools/call' && keyAccessLevel) {
+          const toolName = message.params?.name;
+          if (toolName && !canAccessTool(toolName, keyAccessLevel)) {
+            console.warn(`[Auth] Access denied for ${keyAccessLevel} key attempting to call tool: ${toolName}`);
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ 
+              error: `Access denied: Tool '${toolName}' requires ${getToolAccessLevel(toolName)} access level`
+            }));
+            return;
           }
         }
 
@@ -595,7 +655,8 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`[Startup] ✓ MCP HTTP Wrapper listening on port ${PORT}`);
   console.log(`[Startup] ✓ Endpoints: POST /mcp, GET /health, GET /tools, GET /status`);
-  console.log(`[Startup] ✓ API Key: ${API_KEY ? 'REQUIRED' : 'NOT REQUIRED'}`);
+  console.log(`[Startup] ✓ API Key (Read-only): ${API_KEY_READONLY ? 'CONFIGURED' : 'NOT CONFIGURED'}`);
+  console.log(`[Startup] ✓ API Key (Read-write): ${API_KEY_READWRITE ? 'CONFIGURED' : 'NOT CONFIGURED'}`);
   console.log('[Startup] ✓ Environment variables verified');
   console.log('[Startup] ✓ Initializing rate limiter...');
   initializeRateLimiter();

@@ -48,85 +48,49 @@ process.on('unhandledRejection', (reason, promise) => {
       version: "1.0.0",
     });
 
-    // Note: Modification tools (create, update, delete, feed, link operations) are DISABLED
-    // 27 tools are currently disabled for safety:
-    // Tickets: create, update, patch, feed-add, add-asset, add-contact
-    // Assets: create, update, patch, delete, feed-add
-    // CMDB: create, update, delete, feed-add, add-relationship
-    // KB: create, update, delete
-    // Projects: create, update
-    // People: update
+    // All tools are now registered on the MCP server
+    // Access control is enforced at the HTTP wrapper layer via two-tier API keys:
+    // - MCP_API_KEY_READONLY: Can call read-only tools only (search, get, list, count, etc.)
+    // - MCP_API_KEY_READWRITE: Can call all tools including modifications (create, update, delete, etc.)
     // 
-    // To re-enable, set environment variable: ALLOW_MODIFICATIONS=true
-    const allowModifications = process.env.ALLOW_MODIFICATIONS === "true";
+    // This allows multiple agents to share a single MCP server instance with different access levels
 
-    const registerIfAllowed = (allowFunc: () => void, name: string) => {
-      if (allowModifications) {
-        allowFunc();
-        console.error(`[TDX-MCP] Enabled modification tool: ${name}`);
-      } else {
-        console.error(`[TDX-MCP] Skipped modification tool: ${name}`);
-      }
-    };
-
-    registerIfAllowed(
-      () => registerTicketTools(server, client),
-      "registerTicketTools"
-    );
-    // Ticket read-only tools always enabled
-    console.error("[TDX-MCP] Registering ticket read-only tools...");
+    // Register all ticket tools (read-only + write)
+    console.error("[TDX-MCP] Registering ticket tools (read-only + write)...");
     registerTicketReadOnlyTools(server, client);
-    console.error("[TDX-MCP] Ticket read-only tools registered successfully!");
-
-    // Ticket count tools always enabled
-    console.error("[TDX-MCP] Registering ticket count tools...");
+    registerTicketTools(server, client);
     registerTicketCountTools(server, client);
-    console.error("[TDX-MCP] Ticket count tools registered successfully!");
+    console.error("[TDX-MCP] Ticket tools registered successfully!");
 
-    // Asset read-only tools always enabled
-    console.error("[TDX-MCP] Registering asset read-only tools...");
+    // Register all asset tools (read-only + write)
+    console.error("[TDX-MCP] Registering asset tools (read-only + write)...");
     registerAssetReadOnlyTools(server, client);
-    console.error("[TDX-MCP] Asset read-only tools registered successfully!");
-    registerIfAllowed(
-      () => registerAssetTools(server, client),
-      "registerAssetTools"
-    );
+    registerAssetTools(server, client);
+    console.error("[TDX-MCP] Asset tools registered successfully!");
 
-    // CMDB read-only tools always enabled
-    console.error("[TDX-MCP] Registering CMDB read-only tools...");
+    // Register all CMDB tools (read-only + write)
+    console.error("[TDX-MCP] Registering CMDB tools (read-only + write)...");
     registerCmdbReadOnlyTools(server, client);
-    console.error("[TDX-MCP] CMDB read-only tools registered successfully!");
-    registerIfAllowed(
-      () => registerCmdbTools(server, client),
-      "registerCmdbTools"
-    );
+    registerCmdbTools(server, client);
+    console.error("[TDX-MCP] CMDB tools registered successfully!");
 
-    // KB read-only tools always enabled
-    console.error("[TDX-MCP] Registering KB read-only tools...");
+    // Register all KB tools (read-only + write)
+    console.error("[TDX-MCP] Registering KB tools (read-only + write)...");
     registerKbReadOnlyTools(server, client);
-    console.error("[TDX-MCP] KB read-only tools registered successfully!");
-    registerIfAllowed(
-      () => registerKbTools(server, client),
-      "registerKbTools"
-    );
+    registerKbTools(server, client);
+    console.error("[TDX-MCP] KB tools registered successfully!");
 
-    // Project read-only tools always enabled
-    console.error("[TDX-MCP] Registering project read-only tools...");
+    // Register all project tools (read-only + write)
+    console.error("[TDX-MCP] Registering project tools (read-only + write)...");
     registerProjectReadOnlyTools(server, client);
-    console.error("[TDX-MCP] Project read-only tools registered successfully!");
-    registerIfAllowed(
-      () => registerProjectTools(server, client),
-      "registerProjectTools"
-    );
+    registerProjectTools(server, client);
+    console.error("[TDX-MCP] Project tools registered successfully!");
 
-    // People read-only tools always enabled
-    console.error("[TDX-MCP] Registering people read-only tools...");
+    // Register all people tools (read-only + write)
+    console.error("[TDX-MCP] Registering people tools (read-only + write)...");
     registerPeopleReadOnlyTools(server, client);
-    console.error("[TDX-MCP] People read-only tools registered successfully!");
-    registerIfAllowed(
-      () => registerPeopleTools(server, client),
-      "registerPeopleTools"
-    );
+    registerPeopleTools(server, client);
+    console.error("[TDX-MCP] People tools registered successfully!");
 
     // Read-only tools are always enabled
     registerAccountTools(server, client);
