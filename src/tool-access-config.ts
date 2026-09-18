@@ -22,109 +22,111 @@ export const TOOL_ACCESS_MAP: ToolAccessConfig = {
   // ============================================================================
   
   // Read-only ticket tools
-  'ticket-search': 'readonly',
-  'ticket-get': 'readonly',
-  'ticket-count': 'readonly',
-  'ticket-feed-get': 'readonly',
+  'tdx-ticket-search': 'readonly',
+  'tdx-ticket-get': 'readonly',
+  'tdx-ticket-count': 'readonly',
+  'tdx-ticket-feed-get': 'readonly',
+  'tdx-ticket-types-get': 'readonly',
   
   // Read-write ticket tools (modification)
-  'ticket-create': 'readwrite',
-  'ticket-update': 'readwrite',
-  'ticket-patch': 'readwrite',
-  'ticket-feed-add': 'readwrite',
-  'ticket-add-asset': 'readwrite',
-  'ticket-add-contact': 'readwrite',
+  'tdx-ticket-create': 'readwrite',
+  'tdx-ticket-update': 'readwrite',
+  'tdx-ticket-patch': 'readwrite',
+  'tdx-ticket-feed-add': 'readwrite',
+  'tdx-ticket-add-asset': 'readwrite',
+  'tdx-ticket-add-contact': 'readwrite',
   
   // ============================================================================
   // ASSET TOOLS
   // ============================================================================
   
   // Read-only asset tools
-  'asset-search': 'readonly',
-  'asset-get': 'readonly',
-  'asset-categories': 'readonly',
+  'tdx-asset-search': 'readonly',
+  'tdx-asset-get': 'readonly',
+  'tdx-asset-categories': 'readonly',
   
   // Read-write asset tools (modification)
-  'asset-create': 'readwrite',
-  'asset-update': 'readwrite',
-  'asset-patch': 'readwrite',
-  'asset-delete': 'readwrite',
-  'asset-feed-add': 'readwrite',
+  'tdx-asset-create': 'readwrite',
+  'tdx-asset-update': 'readwrite',
+  'tdx-asset-patch': 'readwrite',
+  'tdx-asset-delete': 'readwrite',
+  'tdx-asset-feed-add': 'readwrite',
   
   // ============================================================================
   // CMDB (CONFIGURATION MANAGEMENT DATABASE) TOOLS
   // ============================================================================
   
   // Read-only CMDB tools
-  'cmdb-search': 'readonly',
-  'cmdb-get': 'readonly',
+  'tdx-cmdb-search': 'readonly',
+  'tdx-cmdb-get': 'readonly',
   
   // Read-write CMDB tools (modification)
-  'cmdb-create': 'readwrite',
-  'cmdb-update': 'readwrite',
-  'cmdb-delete': 'readwrite',
-  'cmdb-feed-add': 'readwrite',
-  'cmdb-add-relationship': 'readwrite',
+  'tdx-cmdb-create': 'readwrite',
+  'tdx-cmdb-update': 'readwrite',
+  'tdx-cmdb-delete': 'readwrite',
+  'tdx-cmdb-feed-add': 'readwrite',
+  'tdx-cmdb-add-relationship': 'readwrite',
   
   // ============================================================================
   // KNOWLEDGE BASE (KB) TOOLS
   // ============================================================================
   
   // Read-only KB tools
-  'kb-search': 'readonly',
-  'kb-get': 'readonly',
+  'tdx-kb-search': 'readonly',
+  'tdx-kb-get': 'readonly',
   
   // Read-write KB tools (modification)
-  'kb-create': 'readwrite',
-  'kb-update': 'readwrite',
-  'kb-delete': 'readwrite',
+  'tdx-kb-create': 'readwrite',
+  'tdx-kb-update': 'readwrite',
+  'tdx-kb-delete': 'readwrite',
   
   // ============================================================================
   // PROJECT TOOLS
   // ============================================================================
   
   // Read-only project tools
-  'project-search': 'readonly',
-  'project-get': 'readonly',
+  'tdx-project-search': 'readonly',
+  'tdx-project-get': 'readonly',
   
   // Read-write project tools (modification)
-  'project-create': 'readwrite',
-  'project-update': 'readwrite',
+  'tdx-project-create': 'readwrite',
+  'tdx-project-update': 'readwrite',
   
   // ============================================================================
   // PEOPLE TOOLS
   // ============================================================================
   
   // Read-only people tools
-  'people-search': 'readonly',
-  'people-get': 'readonly',
-  'people-lookup': 'readonly',
+  'tdx-people-search': 'readonly',
+  'tdx-people-get': 'readonly',
+  'tdx-people-lookup': 'readonly',
   
   // Read-write people tools (modification)
-  'people-update': 'readwrite',
+  'tdx-people-update': 'readwrite',
   
   // ============================================================================
   // ACCOUNT TOOLS (Always read-only)
   // ============================================================================
-  'account-search': 'readonly',
-  'account-get': 'readonly',
+  'tdx-account-search': 'readonly',
+  'tdx-account-get': 'readonly',
   
   // ============================================================================
   // GROUP TOOLS (Always read-only)
   // ============================================================================
-  'group-search': 'readonly',
-  'group-get': 'readonly',
+  'tdx-group-search': 'readonly',
+  'tdx-group-get': 'readonly',
   
   // ============================================================================
   // ATTRIBUTE TOOLS (Always read-only)
   // ============================================================================
-  'attributes-get': 'readonly',
+  'tdx-attributes-get': 'readonly',
   
   // ============================================================================
   // STATUS TOOLS (Always read-only)
   // ============================================================================
-  'statuses-get': 'readonly',
+  'tdx-statuses-get': 'readonly',
 };
+
 
 /**
  * Get the access level required for a specific tool

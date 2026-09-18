@@ -177,12 +177,18 @@ export function registerAssetTools(server: McpServer, client: TdxClient) {
     {
       appId: z.number().optional().describe("TDX app ID (defaults to env TDX_APP_ID)"),
       id: z.number().describe("Asset ID"),
-      data: z.record(z.unknown()).describe("Partial asset data (PascalCase TDX field names)"),
+      data: z.record(z.unknown()).describe("Partial asset data (PascalCase TDX field names, e.g. { \"StatusID\": 5 })"),
     },
     async (params) => {
       const app = params.appId ?? defaultAppId;
       try {
-        const result = await client.patch(`/${app}/assets/${params.id}`, params.data);
+        // TDX's PATCH endpoint requires an RFC 6902 JSON Patch document, not a plain object
+        const patchDoc = Object.entries(params.data).map(([key, value]) => ({
+          op: "replace",
+          path: `/${key}`,
+          value,
+        }));
+        const result = await client.patch(`/${app}/assets/${params.id}`, patchDoc);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
         return { content: [{ type: "text", text: String(e) }], isError: true };
