@@ -8,7 +8,7 @@
 export interface RateLimiterConfig {
   callsPerWindow: number; // e.g., 100 calls per window
   windowMs: number; // e.g., 60000 ms (60 seconds)
-  burstCapacityMultiplier: number; // e.g., 1.5 for burst up to 150 tokens
+  burstCapacityMultiplier: number; // bucket depth as a multiple of callsPerWindow; 1.0 = no burst
   queueTimeoutMs: number; // max time a request waits in queue
   enabled: boolean; // whether rate limiting is enabled
   perKeyShare: number; // fraction of callsPerWindow a single API key may consume
@@ -21,7 +21,7 @@ export interface RateLimiterConfig {
  * - TDX_RATE_LIMIT_ENABLED (true/false, default: true)
  * - TDX_RATE_LIMIT_CALLS (default: 100)
  * - TDX_RATE_LIMIT_WINDOW_MS (default: 60000)
- * - TDX_RATE_LIMIT_BURST_CAPACITY_MULTIPLIER (default: 1.5)
+ * - TDX_RATE_LIMIT_BURST_CAPACITY_MULTIPLIER (default: 1.0, no burst above sustained rate)
  * - TDX_RATE_LIMIT_QUEUE_TIMEOUT_MS (default: 300000, 5 minutes)
  * - TDX_RATE_LIMIT_PER_KEY_SHARE (0-1, default: 0.8)
  */
@@ -40,7 +40,7 @@ export function loadRateLimiterConfig(): RateLimiterConfig {
   );
 
   const burstCapacityMultiplier = parseFloat(
-    process.env.TDX_RATE_LIMIT_BURST_CAPACITY_MULTIPLIER || "1.5"
+    process.env.TDX_RATE_LIMIT_BURST_CAPACITY_MULTIPLIER || "1.0"
   );
 
   const queueTimeoutMs = parseInt(
@@ -74,11 +74,20 @@ export function loadRateLimiterConfig(): RateLimiterConfig {
     );
   }
 
-  if (burstCapacityMultiplier < 1.0 || burstCapacityMultiplier > 3.0) {
+  if (burstCapacityMultiplier < 1.0) {
     console.warn(
       `[Rate Limiter] WARNING: Burst capacity multiplier ${burstCapacityMultiplier} ` +
-      `is outside recommended range [1.0, 3.0]. ` +
-      `Using it anyway, but consider values near 1.5.`
+      `is below 1.0, so the bucket cannot even hold one window's worth of tokens. ` +
+      `Lower TDX_RATE_LIMIT_CALLS instead.`
+    );
+  } else if (burstCapacityMultiplier > 1.0) {
+    // TDX enforces a hard fixed window per IP, so a spike above the sustained rate is
+    // 429'd rather than absorbed -- burst depth buys nothing and stalls the queue.
+    console.warn(
+      `[Rate Limiter] WARNING: Burst capacity multiplier ${burstCapacityMultiplier} lets ` +
+      `${Math.ceil(callsPerWindow * burstCapacityMultiplier)} requests through at once while ` +
+      `the sustained rate is only ${callsPerWindow} per ${windowMs}ms. TDX rate limits are ` +
+      `fixed-window per-IP, so the overshoot becomes 429s. Prefer 1.0.`
     );
   }
 

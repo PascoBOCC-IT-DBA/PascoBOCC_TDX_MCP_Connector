@@ -185,27 +185,56 @@ function getRequestTimeoutMs(message: any): number {
   return REQUEST_TIMEOUT_MS;
 }
 
-function getProvidedApiKey(req: http.IncomingMessage): string {
-  const authHeaderRaw = req.headers.authorization;
-  const authHeader = Array.isArray(authHeaderRaw) ? authHeaderRaw[0] : authHeaderRaw || '';
+/**
+ * Handshake/metadata methods that are answered from the MCP subprocess alone and never
+ * reach the TDX API. They must not consume TDX rate-limit tokens, or a backlog of tool
+ * calls will stall the connection handshake itself. Anything not listed here is still
+ * limited, so a new TDX-backed method is throttled by default.
+ */
+const TDX_EXEMPT_METHODS = new Set([
+  'initialize',
+  'tools/list',
+  'server/discover',
+  'ping',
+]);
 
+function consumesTdxBudget(methodName: string): boolean {
+  return !TDX_EXEMPT_METHODS.has(methodName);
+}
+
+function isMcpEndpoint(url: string | undefined): boolean {
+  return url === '/' || url === '/mcp' || url === '/mcp/';
+}
+
+/**
+ * Every credential a client might have sent, in preference order. Clients (notably
+ * Power Platform connectors) often attach their own Authorization header alongside an
+ * explicit x-api-key, so returning only the first header present would discard the key
+ * the user actually configured.
+ */
+function getProvidedApiKeys(req: http.IncomingMessage): string[] {
+  const keys: string[] = [];
+  const readHeader = (name: string): string => {
+    const raw = req.headers[name];
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    return typeof value === 'string' ? value.trim() : '';
+  };
+
+  const authHeader = readHeader('authorization');
   if (authHeader) {
-    if (authHeader.toLowerCase().startsWith('bearer ')) {
-      return authHeader.slice(7).trim();
-    }
-    return authHeader.trim();
+    keys.push(authHeader.toLowerCase().startsWith('bearer ')
+      ? authHeader.slice(7).trim()
+      : authHeader);
   }
 
-  const candidateHeaders = ['x-api-key', 'api-key', 'x-functions-key'];
-  for (const headerName of candidateHeaders) {
-    const headerRaw = req.headers[headerName];
-    const headerValue = Array.isArray(headerRaw) ? headerRaw[0] : headerRaw;
-    if (typeof headerValue === 'string' && headerValue.trim()) {
-      return headerValue.trim();
+  for (const headerName of ['x-api-key', 'api-key', 'x-functions-key']) {
+    const value = readHeader(headerName);
+    if (value) {
+      keys.push(value);
     }
   }
 
-  return '';
+  return keys.filter(Boolean);
 }
 
 /**
@@ -251,8 +280,20 @@ interface Caller {
 }
 
 function identifyCaller(req: http.IncomingMessage): Caller {
-  const providedKey = getProvidedApiKey(req);
-  return { level: getApiKeyAccessLevel(providedKey), keyId: fingerprintKey(providedKey) };
+  const providedKeys = getProvidedApiKeys(req);
+
+  // Every candidate is checked so an unrelated Authorization header can't mask a valid
+  // x-api-key. Each check is constant-time, so trying several leaks nothing extra.
+  for (const key of providedKeys) {
+    const level = getApiKeyAccessLevel(key);
+    if (level) {
+      return { level, keyId: fingerprintKey(key) };
+    }
+  }
+
+  // Nothing matched: report the first credential offered so the log names what was tried.
+  const attempted = providedKeys[0] ?? '';
+  return { level: null, keyId: fingerprintKey(attempted) };
 }
 
 function describeCaller(caller: Caller): string {
@@ -419,7 +460,7 @@ async function handleMcpRequest(message, res, caller?: Caller) {
   }
 
   // Acquire rate limiter token before proceeding
-  if (rateLimiter) {
+  if (rateLimiter && consumesTdxBudget(methodName)) {
     // Write calls outrank reads in the queue so a busy read-only client can't delay them.
     const priority = caller?.level === 'readwrite' ? 1 : 0;
     const waitStart = Date.now();
@@ -610,7 +651,7 @@ const server = http.createServer((req, res) => {
   }
 
   // MCP endpoint
-  if ((req.url === '/' || req.url === '/mcp' || req.url === '/mcp/') && req.method === 'POST') {
+  if (isMcpEndpoint(req.url) && req.method === 'POST') {
     let body = '';
 
     req.on('data', chunk => {
@@ -676,6 +717,17 @@ const server = http.createServer((req, res) => {
         res.end(JSON.stringify({ error: 'Invalid JSON' }));
       }
     });
+    return;
+  }
+
+  // Streamable HTTP clients probe GET /mcp (server->client SSE stream) and DELETE /mcp
+  // (session teardown). Neither is offered here. The spec says a server that does not
+  // provide them answers 405; a 404 instead makes clients treat the whole endpoint as
+  // missing and abandon the connection rather than falling back to POST-only.
+  if (isMcpEndpoint(req.url) && (req.method === 'GET' || req.method === 'DELETE')) {
+    console.log(`[HTTP] ${req.method} ${req.url} - not supported, returning 405 (POST-only server)`);
+    res.writeHead(405, { 'Content-Type': 'application/json', 'Allow': 'POST, OPTIONS' });
+    res.end(JSON.stringify({ error: 'Method not allowed. This MCP endpoint accepts POST only.' }));
     return;
   }
 

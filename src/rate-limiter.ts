@@ -37,7 +37,7 @@ export class RateLimiter {
   constructor(
     callsPerWindow: number = 100,
     windowMs: number = 60000,
-    burstCapacityMultiplier: number = 1.5
+    burstCapacityMultiplier: number = 1.0
   ) {
     this.refillRate = callsPerWindow / windowMs; // tokens per ms
     this.maxTokens = Math.ceil(callsPerWindow * burstCapacityMultiplier);

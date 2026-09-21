@@ -356,10 +356,12 @@ try {
             KEYVAULT_URL                            = $keyVaultUri
             MCP_API_KEY_READONLY                    = "@Microsoft.KeyVault(SecretUri=${keyVaultUri}secrets/McpApiKeyReadonly/)"
             MCP_API_KEY_READWRITE                   = "@Microsoft.KeyVault(SecretUri=${keyVaultUri}secrets/McpApiKeyReadwrite/)"
+            # Browser-based clients send an Origin header; anything not listed here gets a 403.
+            MCP_ALLOWED_ORIGINS                     = "https://make.gov.powerautomate.us"
             TDX_RATE_LIMIT_ENABLED                  = "true"
             TDX_RATE_LIMIT_CALLS                    = "60"
             TDX_RATE_LIMIT_WINDOW_MS                = "60000"
-            TDX_RATE_LIMIT_BURST_CAPACITY_MULTIPLIER = "1.5"
+            TDX_RATE_LIMIT_BURST_CAPACITY_MULTIPLIER = "1.0"
             TDX_RATE_LIMIT_QUEUE_TIMEOUT_MS         = "300000"
         }
     }
