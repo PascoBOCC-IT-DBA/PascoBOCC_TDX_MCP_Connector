@@ -6,17 +6,25 @@
  * Provides HTTP endpoints that forward requests to the MCP stdio server
  */
 
-// @ts-nocheck
-
 import http from 'http';
+import type { ServerResponse } from 'http';
+import { createHash, timingSafeEqual } from 'crypto';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import dotenv from 'dotenv';
+import { RateLimiter } from './rate-limiter.js';
 import { loadRateLimiterConfig } from './rate-limit-config.js';
-import { canAccessTool, getToolAccessLevel, type AccessLevel } from './tool-access-config.js';
+import { canAccessTool, getToolAccessLevel, filterToolsByAccessLevel, type AccessLevel } from './tool-access-config.js';
 
 type JsonRpcId = string | number;
+
+interface JsonRpcResponse {
+  jsonrpc?: string;
+  id?: JsonRpcId;
+  result?: { tools?: Array<{ name?: string }>; content?: unknown } & Record<string, unknown>;
+  error?: unknown;
+}
 
 // Load environment variables from .env file
 dotenv.config();
@@ -24,10 +32,27 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const PORT = process.env.PORT || process.env.MCP_HTTP_PORT || 3000;
-const API_KEY_READONLY = process.env.MCP_API_KEY_READONLY || null;
-const API_KEY_READWRITE = process.env.MCP_API_KEY_READWRITE || null;
-const ALLOW_UNAUTH_INITIALIZE = process.env.MCP_ALLOW_UNAUTH_INITIALIZE === 'true';
+const PORT = parseInt(process.env.PORT || process.env.MCP_HTTP_PORT || '3000', 10);
+
+const unresolvedKeyVaultRefs: string[] = [];
+
+/**
+ * App Service leaves the literal "@Microsoft.KeyVault(SecretUri=...)" string in the
+ * env var when a Key Vault reference fails to resolve. Treat that as unconfigured so
+ * a failed secret fetch can never become a publicly guessable API key.
+ */
+function readApiKey(envName: string): string | null {
+  const value = (process.env[envName] || '').trim();
+  if (!value) return null;
+  if (value.startsWith('@Microsoft.KeyVault(')) {
+    unresolvedKeyVaultRefs.push(envName);
+    return null;
+  }
+  return value;
+}
+
+const API_KEY_READONLY = readApiKey('MCP_API_KEY_READONLY');
+const API_KEY_READWRITE = readApiKey('MCP_API_KEY_READWRITE');
 // When running from dist/http-wrapper.js, index.js is in the same directory
 const MCPscriptPath = join(__dirname, 'index.js');
 // Global fallback timeout for MCP requests in milliseconds
@@ -41,12 +66,49 @@ console.log(`[Startup] HTTP Wrapper initializing...`);
 console.log(`[Startup] PORT: ${PORT}`);
 console.log(`[Startup] API_KEY_READONLY: ${API_KEY_READONLY ? 'configured' : 'not configured'}`);
 console.log(`[Startup] API_KEY_READWRITE: ${API_KEY_READWRITE ? 'configured' : 'not configured'}`);
-console.log(`[Startup] Allow Unauthenticated Initialize: ${ALLOW_UNAUTH_INITIALIZE ? 'enabled' : 'disabled'}`);
 console.log(`[Startup] MCP Script: ${MCPscriptPath}`);
 console.log(`[Startup] Request Timeout (default): ${REQUEST_TIMEOUT_MS}ms`);
 console.log(`[Startup] Request Timeout (initialize): ${INIT_TIMEOUT_MS}ms`);
 console.log(`[Startup] Request Timeout (tools/list): ${TOOLS_LIST_TIMEOUT_MS}ms`);
 console.log(`[Startup] Request Timeout (tools/call): ${TOOLS_CALL_TIMEOUT_MS}ms`);
+
+/**
+ * Refuse to serve traffic in an insecure configuration rather than failing open.
+ */
+function assertSecureConfiguration() {
+  // The flag was removed; warn so a stale App Service setting doesn't look like it still works.
+  if (process.env.MCP_ALLOW_UNAUTH_INITIALIZE) {
+    console.warn('[Startup] WARNING: MCP_ALLOW_UNAUTH_INITIALIZE is set but no longer supported - every /mcp request requires an API key. Remove the setting.');
+  }
+
+  const problems: string[] = [];
+
+  for (const envName of unresolvedKeyVaultRefs) {
+    problems.push(`${envName} holds an unresolved Key Vault reference - the secret failed to fetch`);
+  }
+
+  if (!API_KEY_READONLY && !API_KEY_READWRITE) {
+    problems.push('Neither MCP_API_KEY_READONLY nor MCP_API_KEY_READWRITE is set - every tool would be reachable unauthenticated');
+  }
+
+  if (API_KEY_READONLY && API_KEY_READWRITE && API_KEY_READONLY === API_KEY_READWRITE) {
+    problems.push('MCP_API_KEY_READONLY and MCP_API_KEY_READWRITE are identical - the read-only tier would grant write access');
+  }
+
+  for (const [name, key] of [['MCP_API_KEY_READONLY', API_KEY_READONLY], ['MCP_API_KEY_READWRITE', API_KEY_READWRITE]] as const) {
+    if (key && key.length < 32) {
+      problems.push(`${name} is shorter than 32 characters`);
+    }
+  }
+
+  if (problems.length > 0) {
+    console.error('[Startup] FATAL: Insecure configuration:');
+    for (const problem of problems) {
+      console.error(`[Startup]   - ${problem}`);
+    }
+    process.exit(1);
+  }
+}
 
 // Initialize Rate Limiter
 let rateLimiter: RateLimiter | null = null;
@@ -130,49 +192,46 @@ function getProvidedApiKey(req: http.IncomingMessage): string {
 }
 
 /**
+ * Constant-time key comparison. Hashing first keeps both inputs the same length,
+ * so timingSafeEqual never throws and length isn't leaked.
+ */
+function keysMatch(providedKey: string, expectedKey: string | null): boolean {
+  if (!expectedKey) return false;
+  const provided = createHash('sha256').update(providedKey, 'utf8').digest();
+  const expected = createHash('sha256').update(expectedKey, 'utf8').digest();
+  return timingSafeEqual(provided, expected);
+}
+
+/**
  * Determine the access level of a provided API key
  * Returns 'readwrite', 'readonly', or null if key is invalid
  */
 function getApiKeyAccessLevel(providedKey: string): AccessLevel | null {
   if (!providedKey) return null;
-  
-  if (API_KEY_READWRITE && providedKey === API_KEY_READWRITE) {
-    return 'readwrite';
-  }
-  
-  if (API_KEY_READONLY && providedKey === API_KEY_READONLY) {
-    return 'readonly';
-  }
-  
+
+  // Both branches always evaluate so the result doesn't depend on which tier matched.
+  const isReadWrite = keysMatch(providedKey, API_KEY_READWRITE);
+  const isReadOnly = keysMatch(providedKey, API_KEY_READONLY);
+
+  if (isReadWrite) return 'readwrite';
+  if (isReadOnly) return 'readonly';
+
   return null;
 }
 
-function isNotificationMessage(message: any): boolean {
-  if (!message || typeof message !== 'object' || Array.isArray(message)) {
-    return false;
+/**
+ * Access level to enforce for a request. Falls back to 'readonly' if a caller ever
+ * reaches here without a key. Returns null only when auth is disabled.
+ */
+function resolveEffectiveAccessLevel(keyAccessLevel: AccessLevel | null | undefined): AccessLevel | null {
+  if (keyAccessLevel) {
+    return keyAccessLevel;
   }
-
-  const hasMessageId = Object.prototype.hasOwnProperty.call(message, 'id');
-  const methodName = typeof message.method === 'string' ? message.method : '';
-
-  return !hasMessageId || methodName.startsWith('notifications/');
+  return (API_KEY_READONLY || API_KEY_READWRITE) ? 'readonly' : null;
 }
 
-function isAllowedWithoutAuthInCompatibilityMode(message: any): boolean {
-  if (!ALLOW_UNAUTH_INITIALIZE) {
-    return false;
-  }
-
-  if (Array.isArray(message)) {
-    return message.length > 0 && message.every((entry) => isNotificationMessage(entry));
-  }
-
-  const methodName = typeof message?.method === 'string' ? message.method : '';
-  if (methodName === 'initialize') {
-    return true;
-  }
-
-  return isNotificationMessage(message);
+function isToolCallMethod(methodName: string): boolean {
+  return methodName === 'tools/call' || methodName === 'call_tool';
 }
 
 /**
@@ -223,7 +282,7 @@ function transformMCPResponse(mcpResponse, requestMessage) {
       _raw: mcpResponse
     };
   } catch (err) {
-    console.error(`[Transform] Error: ${err.message}`);
+    console.error(`[Transform] Error: ${(err as Error).message}`);
     return mcpResponse;
   }
 }
@@ -378,7 +437,6 @@ async function handleMcpRequest(message, res, keyAccessLevel?: AccessLevel | nul
   const timeoutMs = getRequestTimeoutMs(message);
   
   console.log(`[Handler] Processing ${isNotification ? 'NOTIFICATION' : 'REQUEST'} - method: ${methodName}, id: ${message.id}`);
-  
   // Handle notifications (one-way messages that don't expect a response from MCP)
   // Examples: notifications/initialized, notifications/progress, notifications/message
   if (isNotification || methodName.startsWith('notifications/')) {
@@ -427,19 +485,18 @@ async function handleMcpRequest(message, res, keyAccessLevel?: AccessLevel | nul
     }
   }, timeoutMs);
 
-  const promise = new Promise((resolve, reject) => {
+  const promise = new Promise<JsonRpcResponse>((resolve, reject) => {
     pendingRequests.set(requestId, { resolve, reject, timeout });
   });
 
   promise.then((mcpResponse) => {
     if (!res.headersSent) {
       // Filter tool list by API key access level, so a read-only key never sees write tools
-      if (methodName === 'tools/list' && keyAccessLevel && mcpResponse?.result?.tools) {
-        const originalCount = mcpResponse.result.tools.length;
-        mcpResponse.result.tools = mcpResponse.result.tools.filter((tool: any) =>
-          canAccessTool(tool.name, keyAccessLevel)
-        );
-        console.log(`[Handler] tools/list: Filtered ${originalCount} tools to ${mcpResponse.result.tools.length} for ${keyAccessLevel} key`);
+      const tools = mcpResponse?.result?.tools;
+      if (methodName === 'tools/list' && keyAccessLevel && Array.isArray(tools)) {
+        const filtered = filterToolsByAccessLevel(tools, keyAccessLevel);
+        mcpResponse.result!.tools = filtered;
+        console.log(`[Handler] tools/list: Filtered ${tools.length} tools to ${filtered.length} for ${keyAccessLevel} key`);
       }
       // Return raw MCP JSON-RPC response without wrapping
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -564,11 +621,11 @@ const server = http.createServer((req, res) => {
             let tools = parsed?.result?.tools ?? [];
             
             // Filter tools based on API key access level if applicable
-            if (keyAccessLevel) {
-              tools = tools.filter((tool: any) => {
-                return canAccessTool(tool.name, keyAccessLevel);
-              });
-              console.log(`[HTTP] /tools: Filtered ${parsed?.result?.tools?.length ?? 0} tools to ${tools.length} for ${keyAccessLevel} key`);
+            const effectiveAccessLevel = resolveEffectiveAccessLevel(keyAccessLevel);
+            if (effectiveAccessLevel) {
+              const originalCount = tools.length;
+              tools = filterToolsByAccessLevel(tools, effectiveAccessLevel);
+              console.log(`[HTTP] /tools: Filtered ${originalCount} tools to ${tools.length} for ${effectiveAccessLevel} key`);
             }
             
             res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -607,29 +664,26 @@ const server = http.createServer((req, res) => {
       try {
         const message = JSON.parse(body);
 
-        // API Key authentication for MCP endpoint with optional compatibility bypass
+        // API Key authentication for MCP endpoint
         const anyApiKeyConfigured = API_KEY_READONLY || API_KEY_READWRITE;
         let keyAccessLevel: AccessLevel | null = null;
-        
+
         if (anyApiKeyConfigured) {
-          const providedKey = getProvidedApiKey(req);
-          keyAccessLevel = getApiKeyAccessLevel(providedKey);
+          keyAccessLevel = getApiKeyAccessLevel(getProvidedApiKey(req));
 
           if (!keyAccessLevel) {
-            if (!isAllowedWithoutAuthInCompatibilityMode(message)) {
-              res.writeHead(401, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ error: 'Unauthorized' }));
-              return;
-            }
-            console.warn('[Auth] Allowing unauthenticated MCP compatibility request due to MCP_ALLOW_UNAUTH_INITIALIZE=true');
+            res.writeHead(401, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Unauthorized' }));
+            return;
           }
         }
 
         // Validate tool access for tools/call requests
-        if (message.method === 'tools/call' && keyAccessLevel) {
+        const effectiveAccessLevel = resolveEffectiveAccessLevel(keyAccessLevel);
+        if (effectiveAccessLevel && isToolCallMethod(message.method)) {
           const toolName = message.params?.name;
-          if (toolName && !canAccessTool(toolName, keyAccessLevel)) {
-            console.warn(`[Auth] Access denied for ${keyAccessLevel} key attempting to call tool: ${toolName}`);
+          if (toolName && !canAccessTool(toolName, effectiveAccessLevel)) {
+            console.warn(`[Auth] Access denied for ${effectiveAccessLevel} key attempting to call tool: ${toolName}`);
             res.writeHead(403, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ 
               error: `Access denied: Tool '${toolName}' requires ${getToolAccessLevel(toolName)} access level`
@@ -639,7 +693,7 @@ const server = http.createServer((req, res) => {
         }
 
         // Call async handler
-        handleMcpRequest(message, res, keyAccessLevel).catch((err) => {
+        handleMcpRequest(message, res, effectiveAccessLevel).catch((err) => {
           console.error(`[HTTP] Unhandled error in handleMcpRequest: ${err}`);
           if (!res.headersSent) {
             res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -659,6 +713,8 @@ const server = http.createServer((req, res) => {
   res.writeHead(404, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({ error: 'Not found' }));
 });
+
+assertSecureConfiguration();
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`[Startup] ✓ MCP HTTP Wrapper listening on port ${PORT}`);

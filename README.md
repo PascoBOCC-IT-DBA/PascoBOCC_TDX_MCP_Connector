@@ -53,10 +53,11 @@ This design prevents accidental data changes when the server is first deployed. 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `MCP_HTTP_PORT` | No | HTTP port for public deployment mode (e.g. `3000`). Only needed when running as an HTTP server. |
-| `MCP_API_KEY` | No | API key for public deployment authentication. Required when `MCP_HTTP_PORT` is set. |
-| `MCP_ALLOW_UNAUTH_INITIALIZE` | No | Set to `"true"` only when an MCP client cannot send auth on `initialize`. This allows unauthenticated `initialize` requests, while tool calls still require valid API key. Default is `"false"`. |
+| `MCP_API_KEY_READONLY` | No | API key granting access to read-only tools only. Write tools are hidden from `tools/list` and `/tools` and rejected with `403` on `tools/call`. |
+| `MCP_API_KEY_READWRITE` | No | API key granting access to all tools, including create/update/delete. |
 | `NODE_ENV` | No | Node environment (`development` or `production`). Default is `production`. |
-| `ALLOW_MODIFICATIONS` | No | Enable/disable modification tools. Set to `"true"` to enable 22 modification tools (create, update, delete). Default is `"false"` (safe mode - only 21 always-available tools accessible) |
+
+> Access control is enforced by the HTTP wrapper. All 45 tools are registered on the MCP server; the wrapper filters the 22 write tools out of tool listings for a read-only key so clients never see them. Tools missing from `src/tool-access-config.ts` are treated as read-write (fail closed).
 
 ### TDX API Rate Limiting
 | Variable | Required | Default | Description |

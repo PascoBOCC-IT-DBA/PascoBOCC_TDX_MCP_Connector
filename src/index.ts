@@ -4,18 +4,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { loadConfig } from "./config.js";
 import { TdxClient } from "./tdx-client.js";
-import { registerTicketTools, registerTicketReadOnlyTools } from "./tools/tickets.js";
-import { registerTicketCountTools } from "./tools/counts.js";
-import { registerAssetTools, registerAssetReadOnlyTools } from "./tools/assets.js";
-import { registerCmdbTools, registerCmdbReadOnlyTools } from "./tools/cmdb.js";
-import { registerKbTools, registerKbReadOnlyTools } from "./tools/kb.js";
-import { registerProjectTools, registerProjectReadOnlyTools } from "./tools/projects.js";
-import { registerPeopleTools, registerPeopleReadOnlyTools } from "./tools/people.js";
-import { registerAccountTools } from "./tools/accounts.js";
-import { registerGroupTools } from "./tools/groups.js";
-import { registerAttributeTools } from "./tools/attributes.js";
-import { registerStatusTools } from "./tools/statuses.js";
-import { registerTicketTypeTools } from "./tools/ticket-types.js";
+import { registerAllTools } from "./register-tools.js";
 
 // Global error handlers to catch startup errors
 process.on('uncaughtException', (err) => {
@@ -55,49 +44,8 @@ process.on('unhandledRejection', (reason, promise) => {
     // 
     // This allows multiple agents to share a single MCP server instance with different access levels
 
-    // Register all ticket tools (read-only + write)
-    console.error("[TDX-MCP] Registering ticket tools (read-only + write)...");
-    registerTicketReadOnlyTools(server, client);
-    registerTicketTools(server, client);
-    registerTicketCountTools(server, client);
-    console.error("[TDX-MCP] Ticket tools registered successfully!");
-
-    // Register all asset tools (read-only + write)
-    console.error("[TDX-MCP] Registering asset tools (read-only + write)...");
-    registerAssetReadOnlyTools(server, client);
-    registerAssetTools(server, client);
-    console.error("[TDX-MCP] Asset tools registered successfully!");
-
-    // Register all CMDB tools (read-only + write)
-    console.error("[TDX-MCP] Registering CMDB tools (read-only + write)...");
-    registerCmdbReadOnlyTools(server, client);
-    registerCmdbTools(server, client);
-    console.error("[TDX-MCP] CMDB tools registered successfully!");
-
-    // Register all KB tools (read-only + write)
-    console.error("[TDX-MCP] Registering KB tools (read-only + write)...");
-    registerKbReadOnlyTools(server, client);
-    registerKbTools(server, client);
-    console.error("[TDX-MCP] KB tools registered successfully!");
-
-    // Register all project tools (read-only + write)
-    console.error("[TDX-MCP] Registering project tools (read-only + write)...");
-    registerProjectReadOnlyTools(server, client);
-    registerProjectTools(server, client);
-    console.error("[TDX-MCP] Project tools registered successfully!");
-
-    // Register all people tools (read-only + write)
-    console.error("[TDX-MCP] Registering people tools (read-only + write)...");
-    registerPeopleReadOnlyTools(server, client);
-    registerPeopleTools(server, client);
-    console.error("[TDX-MCP] People tools registered successfully!");
-
-    // Read-only tools are always enabled
-    registerAccountTools(server, client);
-    registerGroupTools(server, client);
-    registerAttributeTools(server, client);
-    registerStatusTools(server, client);
-    registerTicketTypeTools(server, client);
+    console.error("[TDX-MCP] Registering all tools (read-only + write)...");
+    registerAllTools(server, client);
     console.error("[TDX-MCP] All tool registrations complete, creating transport...");
 
     const transport = new StdioServerTransport();

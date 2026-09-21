@@ -14,7 +14,7 @@ export interface ToolAccessConfig {
 
 /**
  * Complete tool access mapping
- * Tools not listed here default to 'readonly'
+ * Tools not listed here are treated as 'readwrite' (see getToolAccessLevel)
  */
 export const TOOL_ACCESS_MAP: ToolAccessConfig = {
   // ============================================================================
@@ -130,11 +130,31 @@ export const TOOL_ACCESS_MAP: ToolAccessConfig = {
 
 /**
  * Get the access level required for a specific tool
+ * Unmapped tools fail closed as 'readwrite' so a newly added write tool is never
+ * exposed to a read-only key just because someone forgot to update the map.
  * @param toolName - The name of the tool
  * @returns The access level required ('readonly' or 'readwrite')
  */
 export function getToolAccessLevel(toolName: string): AccessLevel {
-  return TOOL_ACCESS_MAP[toolName] || 'readonly';
+  const mapped = TOOL_ACCESS_MAP[toolName];
+  if (mapped) {
+    return mapped;
+  }
+
+  console.warn(`[Tool Access] Unmapped tool '${toolName}' - defaulting to 'readwrite' (hidden from read-only keys)`);
+  return 'readwrite';
+}
+
+/**
+ * Remove any tool a key with the given access level is not allowed to see.
+ * Used for both tools/list and the /tools endpoint so a read-only key never
+ * learns that write tools exist.
+ */
+export function filterToolsByAccessLevel<T extends { name?: string }>(
+  tools: T[],
+  keyAccessLevel: AccessLevel
+): T[] {
+  return tools.filter((tool) => typeof tool?.name === 'string' && canAccessTool(tool.name, keyAccessLevel));
 }
 
 /**
