@@ -38,8 +38,5 @@ tdx-mcp.service
 .azure/
 docker/
 
-# Compiled ARM output from infra/main.bicep
-infra/main.json
-
 # Test & Query Scripts
 /tests
