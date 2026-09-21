@@ -11,6 +11,7 @@ export interface RateLimiterConfig {
   burstCapacityMultiplier: number; // e.g., 1.5 for burst up to 150 tokens
   queueTimeoutMs: number; // max time a request waits in queue
   enabled: boolean; // whether rate limiting is enabled
+  perKeyShare: number; // fraction of callsPerWindow a single API key may consume
 }
 
 /**
@@ -22,6 +23,7 @@ export interface RateLimiterConfig {
  * - TDX_RATE_LIMIT_WINDOW_MS (default: 60000)
  * - TDX_RATE_LIMIT_BURST_CAPACITY_MULTIPLIER (default: 1.5)
  * - TDX_RATE_LIMIT_QUEUE_TIMEOUT_MS (default: 300000, 5 minutes)
+ * - TDX_RATE_LIMIT_PER_KEY_SHARE (0-1, default: 0.8)
  */
 export function loadRateLimiterConfig(): RateLimiterConfig {
   const enabled =
@@ -44,6 +46,10 @@ export function loadRateLimiterConfig(): RateLimiterConfig {
   const queueTimeoutMs = parseInt(
     process.env.TDX_RATE_LIMIT_QUEUE_TIMEOUT_MS || "300000",
     10
+  );
+
+  const perKeyShare = parseFloat(
+    process.env.TDX_RATE_LIMIT_PER_KEY_SHARE || "0.8"
   );
 
   // Validation
@@ -82,6 +88,12 @@ export function loadRateLimiterConfig(): RateLimiterConfig {
     );
   }
 
+  if (!(perKeyShare > 0) || perKeyShare > 1) {
+    errors.push(
+      `TDX_RATE_LIMIT_PER_KEY_SHARE must be greater than 0 and at most 1, got: ${perKeyShare}`
+    );
+  }
+
   if (errors.length > 0) {
     throw new Error(
       `Invalid rate limiter configuration:\n${errors.join("\n")}`
@@ -97,6 +109,7 @@ export function loadRateLimiterConfig(): RateLimiterConfig {
     `(~${refillRatePerSec.toFixed(2)} calls/sec), ` +
     `burst capacity: ${Math.ceil(callsPerWindow * burstCapacityMultiplier)} tokens, ` +
     `queue timeout: ${queueTimeoutMs}ms, ` +
+    `per-key cap: ${Math.max(1, Math.floor(callsPerWindow * perKeyShare))} calls, ` +
     `enabled: ${enabled}`
   );
 
@@ -106,5 +119,6 @@ export function loadRateLimiterConfig(): RateLimiterConfig {
     burstCapacityMultiplier,
     queueTimeoutMs,
     enabled,
+    perKeyShare,
   };
 }

@@ -14,6 +14,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import dotenv from 'dotenv';
 import { RateLimiter } from './rate-limiter.js';
+import { PerKeyQuota } from './per-key-quota.js';
 import { loadRateLimiterConfig } from './rate-limit-config.js';
 import { canAccessTool, getToolAccessLevel, filterToolsByAccessLevel, type AccessLevel } from './tool-access-config.js';
 
@@ -112,6 +113,8 @@ function assertSecureConfiguration() {
 
 // Initialize Rate Limiter
 let rateLimiter: RateLimiter | null = null;
+let perKeyQuota: PerKeyQuota | null = null;
+let queueTimeoutMs = 300000;
 let rateLimiterStatsInterval: NodeJS.Timeout | null = null;
 
 function initializeRateLimiter() {
@@ -128,6 +131,13 @@ function initializeRateLimiter() {
       config.windowMs,
       config.burstCapacityMultiplier
     );
+
+    perKeyQuota = new PerKeyQuota(
+      Math.max(1, Math.floor(config.callsPerWindow * config.perKeyShare)),
+      config.windowMs
+    );
+
+    queueTimeoutMs = config.queueTimeoutMs;
 
     console.error(`[Startup] ✓ Rate limiter initialized: ${config.callsPerWindow} calls per ${config.windowMs}ms`);
 
@@ -147,6 +157,7 @@ function initializeRateLimiter() {
   } catch (err) {
     console.error(`[Startup] Failed to initialize rate limiter: ${err}`);
     rateLimiter = null;
+    perKeyQuota = null;
   }
 }
 
@@ -217,6 +228,29 @@ function getApiKeyAccessLevel(providedKey: string): AccessLevel | null {
   if (isReadOnly) return 'readonly';
 
   return null;
+}
+
+/**
+ * Short, stable, non-reversible label for a key so logs and quotas can name a caller
+ * without ever recording the secret itself.
+ */
+function fingerprintKey(providedKey: string): string {
+  if (!providedKey) return 'none';
+  return createHash('sha256').update(providedKey, 'utf8').digest('hex').slice(0, 8);
+}
+
+interface Caller {
+  level: AccessLevel | null;
+  keyId: string;
+}
+
+function identifyCaller(req: http.IncomingMessage): Caller {
+  const providedKey = getProvidedApiKey(req);
+  return { level: getApiKeyAccessLevel(providedKey), keyId: fingerprintKey(providedKey) };
+}
+
+function describeCaller(caller: Caller): string {
+  return `${caller.level ?? 'unauthenticated'}/${caller.keyId}`;
 }
 
 /**
@@ -430,7 +464,7 @@ function ensureStdoutListener() {
 }
 
 // Handle MCP JSON-RPC requests
-async function handleMcpRequest(message, res, keyAccessLevel?: AccessLevel | null) {
+async function handleMcpRequest(message, res, caller?: Caller) {
   const hasMessageId = Object.prototype.hasOwnProperty.call(message, 'id');
   const isNotification = !hasMessageId; // Notifications don't have an ID in JSON-RPC 2.0
   const methodName = message.method || 'unknown';
@@ -448,16 +482,29 @@ async function handleMcpRequest(message, res, keyAccessLevel?: AccessLevel | nul
 
   // Acquire rate limiter token before proceeding
   if (rateLimiter) {
+    // Write calls outrank reads in the queue so a busy read-only client can't delay them.
+    const priority = caller?.level === 'readwrite' ? 1 : 0;
+    const waitStart = Date.now();
+
     try {
-      const acquireStart = Date.now();
-      await rateLimiter.acquire();
-      const acquireTime = Date.now() - acquireStart;
+      // A single key may only take its configured share of the shared TDX budget.
+      // Over-share callers wait for their window rather than failing outright.
+      if (perKeyQuota && caller) {
+        await perKeyQuota.acquire(caller.keyId, queueTimeoutMs);
+      }
+
+      // Both queues share one deadline so a slow key wait can't double the client's wait.
+      const remainingMs = Math.max(1, queueTimeoutMs - (Date.now() - waitStart));
+      await rateLimiter.acquire(priority, remainingMs);
+
+      const acquireTime = Date.now() - waitStart;
       if (acquireTime > 100) {
-        console.error(`[Rate Limiter] Request queued for ${acquireTime}ms`);
+        console.error(`[Rate Limiter] Request queued for ${acquireTime}ms (caller: ${caller ? describeCaller(caller) : 'internal'}, method: ${methodName})`);
       }
     } catch (err) {
-      console.error(`[Rate Limiter] Failed to acquire token: ${err}`);
-      res.writeHead(429, { 'Content-Type': 'application/json' });
+      const waitedMs = Date.now() - waitStart;
+      console.error(`[Rate Limiter] Gave up after ${waitedMs}ms for ${caller ? describeCaller(caller) : 'internal'}: ${err}`);
+      res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': String(Math.ceil(queueTimeoutMs / 1000)) });
       res.end(JSON.stringify({ error: 'Service rate limit exceeded', details: (err as Error).message }));
       return;
     }
@@ -493,10 +540,10 @@ async function handleMcpRequest(message, res, keyAccessLevel?: AccessLevel | nul
     if (!res.headersSent) {
       // Filter tool list by API key access level, so a read-only key never sees write tools
       const tools = mcpResponse?.result?.tools;
-      if (methodName === 'tools/list' && keyAccessLevel && Array.isArray(tools)) {
-        const filtered = filterToolsByAccessLevel(tools, keyAccessLevel);
+      if (methodName === 'tools/list' && caller?.level && Array.isArray(tools)) {
+        const filtered = filterToolsByAccessLevel(tools, caller.level);
         mcpResponse.result!.tools = filtered;
-        console.log(`[Handler] tools/list: Filtered ${tools.length} tools to ${filtered.length} for ${keyAccessLevel} key`);
+        console.log(`[Handler] tools/list: Filtered ${tools.length} tools to ${filtered.length} for ${describeCaller(caller)}`);
       }
       // Return raw MCP JSON-RPC response without wrapping
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -562,9 +609,9 @@ const server = http.createServer((req, res) => {
   // Only enforce if at least one API key is configured
   const anyApiKeyConfigured = API_KEY_READONLY || API_KEY_READWRITE;
   if (anyApiKeyConfigured && !isPublicEndpoint && req.url !== '/' && req.url !== '/mcp' && req.url !== '/mcp/') {
-    const providedKey = getProvidedApiKey(req);
-    const keyAccessLevel = getApiKeyAccessLevel(providedKey);
-    if (!keyAccessLevel) {
+    const caller = identifyCaller(req);
+    if (!caller.level) {
+      console.warn(`[Auth] Rejected ${req.method} ${req.url} - invalid or missing key (fingerprint: ${caller.keyId})`);
       res.writeHead(401, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Unauthorized' }));
       return;
@@ -593,12 +640,13 @@ const server = http.createServer((req, res) => {
   // Tools list endpoint - returns available tools filtered by API key access level
   if (req.url === '/tools' && req.method === 'GET') {
     // Get API key access level for filtering
-    const providedKey = getProvidedApiKey(req);
-    const keyAccessLevel = getApiKeyAccessLevel(providedKey);
+    const caller = identifyCaller(req);
+    const keyAccessLevel = caller.level;
     
     // Check if API keys are configured and if the provided key is valid
     const anyApiKeyConfigured = API_KEY_READONLY || API_KEY_READWRITE;
     if (anyApiKeyConfigured && !keyAccessLevel) {
+      console.warn(`[Auth] Rejected GET /tools - invalid or missing key (fingerprint: ${caller.keyId})`);
       res.writeHead(401, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Unauthorized - Invalid or missing API key' }));
       return;
@@ -625,7 +673,7 @@ const server = http.createServer((req, res) => {
             if (effectiveAccessLevel) {
               const originalCount = tools.length;
               tools = filterToolsByAccessLevel(tools, effectiveAccessLevel);
-              console.log(`[HTTP] /tools: Filtered ${originalCount} tools to ${tools.length} for ${effectiveAccessLevel} key`);
+              console.log(`[HTTP] /tools: Filtered ${originalCount} tools to ${tools.length} for ${describeCaller(caller)}`);
             }
             
             res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -637,7 +685,7 @@ const server = http.createServer((req, res) => {
         res.end(body);
       }
     };
-    handleMcpRequest(toolsListMessage, fakeRes as unknown as ServerResponse).catch((err) => {
+    handleMcpRequest(toolsListMessage, fakeRes as unknown as ServerResponse, { level: null, keyId: caller.keyId }).catch((err) => {
       console.error(`[HTTP] /tools error: ${err}`);
       if (!responded && !res.headersSent) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -666,12 +714,13 @@ const server = http.createServer((req, res) => {
 
         // API Key authentication for MCP endpoint
         const anyApiKeyConfigured = API_KEY_READONLY || API_KEY_READWRITE;
-        let keyAccessLevel: AccessLevel | null = null;
+        let caller: Caller = { level: null, keyId: 'none' };
 
         if (anyApiKeyConfigured) {
-          keyAccessLevel = getApiKeyAccessLevel(getProvidedApiKey(req));
+          caller = identifyCaller(req);
 
-          if (!keyAccessLevel) {
+          if (!caller.level) {
+            console.warn(`[Auth] Rejected POST ${req.url} method '${message?.method ?? 'unknown'}' - invalid or missing key (fingerprint: ${caller.keyId})`);
             res.writeHead(401, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Unauthorized' }));
             return;
@@ -679,11 +728,12 @@ const server = http.createServer((req, res) => {
         }
 
         // Validate tool access for tools/call requests
-        const effectiveAccessLevel = resolveEffectiveAccessLevel(keyAccessLevel);
+        const effectiveAccessLevel = resolveEffectiveAccessLevel(caller.level);
+        const effectiveCaller: Caller = { level: effectiveAccessLevel, keyId: caller.keyId };
         if (effectiveAccessLevel && isToolCallMethod(message.method)) {
           const toolName = message.params?.name;
           if (toolName && !canAccessTool(toolName, effectiveAccessLevel)) {
-            console.warn(`[Auth] Access denied for ${effectiveAccessLevel} key attempting to call tool: ${toolName}`);
+            console.warn(`[Auth] Access denied for ${describeCaller(effectiveCaller)} attempting to call tool: ${toolName}`);
             res.writeHead(403, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ 
               error: `Access denied: Tool '${toolName}' requires ${getToolAccessLevel(toolName)} access level`
@@ -693,7 +743,7 @@ const server = http.createServer((req, res) => {
         }
 
         // Call async handler
-        handleMcpRequest(message, res, effectiveAccessLevel).catch((err) => {
+        handleMcpRequest(message, res, effectiveCaller).catch((err) => {
           console.error(`[HTTP] Unhandled error in handleMcpRequest: ${err}`);
           if (!res.headersSent) {
             res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -760,6 +810,9 @@ process.on('SIGTERM', () => {
   }
   if (rateLimiter) {
     rateLimiter.shutdown();
+  }
+  if (perKeyQuota) {
+    perKeyQuota.shutdown();
   }
   if (globalMcpProcess && !globalMcpProcess.killed) {
     globalMcpProcess.kill();

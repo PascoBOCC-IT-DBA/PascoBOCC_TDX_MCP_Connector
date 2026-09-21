@@ -1,5 +1,24 @@
 import { TdxAuth } from "./auth.js";
 import { TdxConfig } from "./config.js";
+import {
+  RateLimitSnapshot,
+  TdxRateLimitError,
+  describeRateLimit,
+  parseRateLimitHeaders,
+  retryDelayMs,
+} from "./tdx-rate-limit.js";
+
+const DEFAULT_MAX_RATE_LIMIT_RETRIES = 3;
+const DEFAULT_RETRY_BUDGET_MS = 180_000;
+
+export interface TdxClientOptions {
+  /** How many times a 429 may be retried before giving up. */
+  maxRateLimitRetries?: number;
+  /** Ceiling on the whole request including retry waits; defaults to MCP_TOOLS_CALL_TIMEOUT_MS. */
+  retryBudgetMs?: number;
+  /** Injected by tests so retry waits cost no wall-clock time. */
+  sleep?: (ms: number) => Promise<void>;
+}
 
 export class TdxClient {
   private auth: TdxAuth;
@@ -8,12 +27,24 @@ export class TdxClient {
   public assetsAppId?: number;
   public kbAppId?: number;
 
-  constructor(config: TdxConfig) {
+  private readonly maxRateLimitRetries: number;
+  private readonly retryBudgetMs: number;
+  private readonly sleep: (ms: number) => Promise<void>;
+
+  constructor(config: TdxConfig, options: TdxClientOptions = {}) {
     this.auth = new TdxAuth(config);
     this.baseUrl = config.baseUrl;
     this.appId = config.appId;
     this.assetsAppId = config.assetsAppId;
     this.kbAppId = config.kbAppId;
+
+    this.maxRateLimitRetries =
+      options.maxRateLimitRetries ?? DEFAULT_MAX_RATE_LIMIT_RETRIES;
+    this.retryBudgetMs =
+      options.retryBudgetMs ??
+      parseInt(process.env.MCP_TOOLS_CALL_TIMEOUT_MS || String(DEFAULT_RETRY_BUDGET_MS), 10);
+    this.sleep =
+      options.sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
   }
 
   async request(
@@ -24,12 +55,9 @@ export class TdxClient {
   ): Promise<unknown> {
     console.error(`[TDX Client] ${method} ${path} - getting token...`);
     const startTime = Date.now();
+    const deadline = startTime + this.retryBudgetMs;
     
     try {
-      const token = await this.auth.getToken();
-      const authTime = Date.now() - startTime;
-      console.error(`[TDX Client] Token obtained in ${authTime}ms`);
-      
       let url = `${this.baseUrl}${path}`;
 
       if (query) {
@@ -37,20 +65,7 @@ export class TdxClient {
         url += `?${params.toString()}`;
       }
 
-      const headers: Record<string, string> = {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      };
-
-      console.error(`[TDX Client] Making request to ${url}`);
-      const fetchStart = Date.now();
-      const res = await fetch(url, {
-        method,
-        headers,
-        body: body !== undefined ? JSON.stringify(body) : undefined,
-      });
-      const fetchTime = Date.now() - fetchStart;
-      console.error(`[TDX Client] Response received in ${fetchTime}ms: HTTP ${res.status}`);
+      const res = await this.fetchWithRateLimitRetry(method, path, url, body, startTime, deadline);
 
       if (!res.ok) {
         const text = await res.text();
@@ -78,6 +93,86 @@ export class TdxClient {
         console.error(`[TDX Client] ❌ Error after ${totalTime}ms: ${err.message}`);
       }
       throw err;
+    }
+  }
+
+  /**
+   * Performs the call, retrying only on 429.
+   *
+   * A 429 means TDX rejected the request without executing it, so replaying it is safe even
+   * for writes. Every other failure -- including 5xx -- is returned untouched: the server may
+   * well have applied the change, and retrying it could duplicate a ticket or an asset.
+   */
+  private async fetchWithRateLimitRetry(
+    method: string,
+    path: string,
+    url: string,
+    body: unknown,
+    startTime: number,
+    deadline: number
+  ): Promise<Response> {
+    let snapshot: RateLimitSnapshot = {};
+
+    for (let attempt = 1; ; attempt++) {
+      const token = await this.auth.getToken();
+      console.error(`[TDX Client] Token obtained in ${Date.now() - startTime}ms`);
+
+      const headers: Record<string, string> = {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      };
+
+      console.error(`[TDX Client] Making request to ${url}`);
+      const fetchStart = Date.now();
+      const res = await fetch(url, {
+        method,
+        headers,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      });
+      const fetchTime = Date.now() - fetchStart;
+      console.error(`[TDX Client] Response received in ${fetchTime}ms: HTTP ${res.status}`);
+
+      snapshot = parseRateLimitHeaders(res.headers);
+      if (snapshot.remaining !== undefined && snapshot.remaining <= 2) {
+        console.error(`[TDX Client] ⚠️ Approaching TDX limit: ${describeRateLimit(snapshot)}`);
+      }
+
+      if (res.status !== 429) {
+        return res;
+      }
+
+      // Drain the body so the socket can be reused for the retry.
+      await res.text().catch(() => "");
+
+      if (attempt > this.maxRateLimitRetries) {
+        throw new TdxRateLimitError(
+          `TDX throttled ${method} ${path} and did not recover after ${this.maxRateLimitRetries} ` +
+          `retries (${describeRateLimit(snapshot)}). Retry later or reduce request volume.`,
+          method,
+          path,
+          attempt,
+          snapshot
+        );
+      }
+
+      const waitMs = retryDelayMs(snapshot);
+      if (Date.now() + waitMs > deadline) {
+        throw new TdxRateLimitError(
+          `TDX throttled ${method} ${path} and the ${Math.round(waitMs / 1000)}s wait until its ` +
+          `limit resets exceeds the ${Math.round(this.retryBudgetMs / 1000)}s request budget ` +
+          `(${describeRateLimit(snapshot)}). Retry later or reduce request volume.`,
+          method,
+          path,
+          attempt,
+          snapshot
+        );
+      }
+
+      console.error(
+        `[TDX Client] ⏳ HTTP 429 on ${method} ${path} (attempt ${attempt}/${this.maxRateLimitRetries + 1}); ` +
+        `waiting ${waitMs}ms -- ${describeRateLimit(snapshot)}`
+      );
+      await this.sleep(waitMs);
     }
   }
 

@@ -66,7 +66,8 @@ This design prevents accidental data changes when the server is first deployed. 
 | `TDX_RATE_LIMIT_CALLS` | No | `100` | Maximum API calls allowed per window (matches TDX's limit). |
 | `TDX_RATE_LIMIT_WINDOW_MS` | No | `60000` | Rate limit window duration in milliseconds (60 seconds). |
 | `TDX_RATE_LIMIT_BURST_CAPACITY_MULTIPLIER` | No | `1.5` | Burst capacity multiplier (e.g., 1.5 = up to 150 concurrent tokens). Helps handle traffic spikes without queuing. |
-| `TDX_RATE_LIMIT_QUEUE_TIMEOUT_MS` | No | `300000` | Maximum time (milliseconds) a request can wait in queue before being rejected (5 minutes). |
+| `TDX_RATE_LIMIT_QUEUE_TIMEOUT_MS` | No | `300000` | Maximum time (milliseconds) a request can wait across both the per-key and global queues before being rejected with HTTP 429 (5 minutes). |
+| `TDX_RATE_LIMIT_PER_KEY_SHARE` | No | `0.8` | Fraction of `TDX_RATE_LIMIT_CALLS` a single API key may consume per window. Keeps one key from starving the other tier. Callers over their share queue until their window rolls forward, and are only rejected if that wait would exceed the queue timeout. Must be greater than 0 and at most 1. |
 
 ## Architecture
 
@@ -272,7 +273,6 @@ PascoBOCC_TDX_MCP_Connector/
     auth.ts                # TDX authentication (token management)
     config.ts              # Configuration and validation
     tdx-client.ts          # TDX API client
-    asset-batcher.ts       # Asset batch processing utility
     tools/
       tickets.ts           # 9 ticket tools
       assets.ts            # 8 asset tools
