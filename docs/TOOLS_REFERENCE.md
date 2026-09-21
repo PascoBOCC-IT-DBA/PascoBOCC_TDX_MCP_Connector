@@ -24,7 +24,6 @@
 # TICKETS
 
 ## tdx-ticket-search
-**Status:** ✅ ENABLED  
 **Type:** Read-only / Search
 
 Searches and filters TeamDynamix tickets. All filters combine with AND logic.
@@ -95,7 +94,6 @@ Searches and filters TeamDynamix tickets. All filters combine with AND logic.
 ---
 
 ## tdx-ticket-count
-**Status:** ✅ ENABLED  
 **Type:** Read-only / Count + Preview
 
 Gets count of tickets matching filters and returns a preview of matching tickets. `count` always reflects the full match set; `maxSummaryResults` only limits the preview array. Efficient for aggregate queries without retrieving full result sets.
@@ -175,7 +173,6 @@ User asks: "How many open tickets assigned to group IT Support?"
 ---
 
 ## tdx-ticket-get
-**Status:** ✅ ENABLED  
 **Type:** Read-only / Get
 
 Retrieves full details for a specific ticket by ID.
@@ -189,7 +186,6 @@ Retrieves full details for a specific ticket by ID.
 ---
 
 ## tdx-ticket-feed-get
-**Status:** ✅ ENABLED  
 **Type:** Read-only / Feed
 
 Retrieves the activity feed/comment history for a specific ticket.
@@ -224,7 +220,7 @@ Retrieves the activity feed/comment history for a specific ticket.
 ---
 
 ## tdx-ticket-create
-**Status:** 🔴 DISABLED  
+**Status:** Requires read-write key  
 **Type:** Create
 
 Creates a new ticket in TeamDynamix.
@@ -246,12 +242,12 @@ Creates a new ticket in TeamDynamix.
 - `attributes` (array, optional) - Custom attributes with id and value
 - `appId` (integer, optional) - Application ID (defaults to TDX_APP_ID)
 
-**Status:** Modification tools disabled for safety. Enable via `ALLOW_MODIFICATIONS=true` environment variable only in authorized environments.
+**Status:** Requires a read-write API key (`MCP_API_KEY_READWRITE`). Hidden from read-only keys and rejected with `403`.
 
 ---
 
 ## tdx-ticket-update
-**Status:** 🔴 DISABLED  
+**Status:** Requires read-write key  
 **Type:** Update (Full)
 
 Fully updates a ticket (all fields must be provided).
@@ -261,12 +257,12 @@ Fully updates a ticket (all fields must be provided).
 - `data` (object, required) - Full ticket data with PascalCase TDX field names
 - `appId` (integer, optional) - Application ID (defaults to TDX_APP_ID)
 
-**Status:** Modification tools disabled for safety. Enable via `ALLOW_MODIFICATIONS=true` environment variable only in authorized environments.
+**Status:** Requires a read-write API key (`MCP_API_KEY_READWRITE`). Hidden from read-only keys and rejected with `403`.
 
 ---
 
 ## tdx-ticket-patch
-**Status:** 🔴 DISABLED  
+**Status:** Requires read-write key  
 **Type:** Update (Partial)
 
 Partially updates a ticket (only specified fields are updated).
@@ -276,12 +272,12 @@ Partially updates a ticket (only specified fields are updated).
 - `data` (object, required) - Partial ticket data with PascalCase TDX field names
 - `appId` (integer, optional) - Application ID (defaults to TDX_APP_ID)
 
-**Status:** Modification tools disabled for safety. Enable via `ALLOW_MODIFICATIONS=true` environment variable only in authorized environments.
+**Status:** Requires a read-write API key (`MCP_API_KEY_READWRITE`). Hidden from read-only keys and rejected with `403`.
 
 ---
 
 ## tdx-ticket-feed-add
-**Status:** 🔴 DISABLED  
+**Status:** Requires read-write key  
 **Type:** Feed/Comment
 
 Adds a comment/note to a ticket's activity feed.
@@ -293,12 +289,12 @@ Adds a comment/note to a ticket's activity feed.
 - `notify` (string[], optional) - UIDs of people to notify
 - `appId` (integer, optional) - Application ID (defaults to TDX_APP_ID)
 
-**Status:** Modification tools disabled for safety. Enable via `ALLOW_MODIFICATIONS=true` environment variable only in authorized environments.
+**Status:** Requires a read-write API key (`MCP_API_KEY_READWRITE`). Hidden from read-only keys and rejected with `403`.
 
 ---
 
 ## tdx-ticket-add-asset
-**Status:** 🔴 DISABLED  
+**Status:** Requires read-write key  
 **Type:** Link/Association
 
 Links an asset to a ticket.
@@ -308,12 +304,12 @@ Links an asset to a ticket.
 - `assetId` (integer, required) - Asset ID to link
 - `appId` (integer, optional) - Application ID (defaults to TDX_APP_ID)
 
-**Status:** Modification tools disabled for safety. Enable via `ALLOW_MODIFICATIONS=true` environment variable only in authorized environments.
+**Status:** Requires a read-write API key (`MCP_API_KEY_READWRITE`). Hidden from read-only keys and rejected with `403`.
 
 ---
 
 ## tdx-ticket-add-contact
-**Status:** 🔴 DISABLED  
+**Status:** Requires read-write key  
 **Type:** Link/Association
 
 Adds a contact/person to a ticket.
@@ -323,14 +319,13 @@ Adds a contact/person to a ticket.
 - `uid` (string, required) - Person UID to add as contact
 - `appId` (integer, optional) - Application ID (defaults to TDX_APP_ID)
 
-**Status:** Modification tools disabled for safety. Enable via `ALLOW_MODIFICATIONS=true` environment variable only in authorized environments.
+**Status:** Requires a read-write API key (`MCP_API_KEY_READWRITE`). Hidden from read-only keys and rejected with `403`.
 
 ---
 
 # ASSETS
 
 ## tdx-asset-get
-**Status:** ✅ ENABLED  
 **Type:** Read-only / Get
 
 Retrieves full details for a specific asset by ID.
@@ -376,7 +371,6 @@ Retrieves full details for a specific asset by ID.
 ---
 
 ## tdx-asset-search
-**Status:** ✅ ENABLED  
 **Type:** Read-only / Search
 
 Searches and filters assets with multiple filter options. All filters combine with AND logic.
@@ -435,7 +429,7 @@ Searches and filters assets with multiple filter options. All filters combine wi
 ---
 
 ## tdx-asset-create
-**Status:** 🔴 DISABLED  
+**Status:** Requires read-write key  
 **Type:** Create
 
 Creates a new asset in inventory.
@@ -461,12 +455,12 @@ Creates a new asset in inventory.
 - `attributes` (array, optional) - Custom attributes with id and value
 - `appId` (integer, optional) - Application ID (defaults to TDX_ASSETS_APP_ID or TDX_APP_ID)
 
-**Status:** Modification tools disabled for safety. Enable via `ALLOW_MODIFICATIONS=true` environment variable only in authorized environments.
+**Status:** Requires a read-write API key (`MCP_API_KEY_READWRITE`). Hidden from read-only keys and rejected with `403`.
 
 ---
 
 ## tdx-asset-update
-**Status:** 🔴 DISABLED  
+**Status:** Requires read-write key  
 **Type:** Update (Full)
 
 Fully updates an asset (all fields must be provided).
@@ -476,12 +470,12 @@ Fully updates an asset (all fields must be provided).
 - `data` (object, required) - Full asset data with PascalCase TDX field names
 - `appId` (integer, optional) - Application ID (defaults to TDX_ASSETS_APP_ID or TDX_APP_ID)
 
-**Status:** Modification tools disabled for safety. Enable via `ALLOW_MODIFICATIONS=true` environment variable only in authorized environments.
+**Status:** Requires a read-write API key (`MCP_API_KEY_READWRITE`). Hidden from read-only keys and rejected with `403`.
 
 ---
 
 ## tdx-asset-patch
-**Status:** 🔴 DISABLED  
+**Status:** Requires read-write key  
 **Type:** Update (Partial)
 
 Partially updates an asset (only specified fields are updated).
@@ -491,12 +485,12 @@ Partially updates an asset (only specified fields are updated).
 - `data` (object, required) - Partial asset data with PascalCase TDX field names
 - `appId` (integer, optional) - Application ID (defaults to TDX_ASSETS_APP_ID or TDX_APP_ID)
 
-**Status:** Modification tools disabled for safety. Enable via `ALLOW_MODIFICATIONS=true` environment variable only in authorized environments.
+**Status:** Requires a read-write API key (`MCP_API_KEY_READWRITE`). Hidden from read-only keys and rejected with `403`.
 
 ---
 
 ## tdx-asset-delete
-**Status:** 🔴 DISABLED  
+**Status:** Requires read-write key  
 **Type:** Delete
 
 Deletes an asset.
@@ -505,12 +499,12 @@ Deletes an asset.
 - `id` (integer, required) - Asset ID
 - `appId` (integer, optional) - Application ID (defaults to TDX_ASSETS_APP_ID or TDX_APP_ID)
 
-**Status:** Modification tools disabled for safety. Enable via `ALLOW_MODIFICATIONS=true` environment variable only in authorized environments.
+**Status:** Requires a read-write API key (`MCP_API_KEY_READWRITE`). Hidden from read-only keys and rejected with `403`.
 
 ---
 
 ## tdx-asset-feed-add
-**Status:** 🔴 DISABLED  
+**Status:** Requires read-write key  
 **Type:** Feed/Comment
 
 Adds a comment/note to an asset's activity feed.
@@ -522,12 +516,11 @@ Adds a comment/note to an asset's activity feed.
 - `notify` (string[], optional) - UIDs of people to notify
 - `appId` (integer, optional) - Application ID (defaults to TDX_ASSETS_APP_ID or TDX_APP_ID)
 
-**Status:** Modification tools disabled for safety. Enable via `ALLOW_MODIFICATIONS=true` environment variable only in authorized environments.
+**Status:** Requires a read-write API key (`MCP_API_KEY_READWRITE`). Hidden from read-only keys and rejected with `403`.
 
 ---
 
 ## tdx-asset-categories
-**Status:** ✅ ENABLED  
 **Type:** Read-only / Metadata
 
 Retrieves all available asset categories/forms in TeamDynamix.
@@ -588,7 +581,6 @@ Retrieves all available asset categories/forms in TeamDynamix.
 # CMDB
 
 ## tdx-cmdb-get
-**Status:** ✅ ENABLED  
 **Type:** Read-only / Get
 
 Retrieves full details for a specific configuration item (CI) by ID.
@@ -628,7 +620,6 @@ Retrieves full details for a specific configuration item (CI) by ID.
 ---
 
 ## tdx-cmdb-search
-**Status:** ✅ ENABLED  
 **Type:** Read-only / Search
 
 Searches and filters configuration items with multiple filter options. All filters combine with AND logic.
@@ -673,7 +664,7 @@ Searches and filters configuration items with multiple filter options. All filte
 ---
 
 ## tdx-cmdb-create
-**Status:** 🔴 DISABLED  
+**Status:** Requires read-write key  
 **Type:** Create
 
 Creates a new configuration item (CI).
@@ -691,12 +682,12 @@ Creates a new configuration item (CI).
 - `externalId` (string, optional) - External ID
 - `attributes` (array, optional) - Custom attributes with id and value
 
-**Status:** Modification tools disabled for safety. Enable via `ALLOW_MODIFICATIONS=true` environment variable only in authorized environments.
+**Status:** Requires a read-write API key (`MCP_API_KEY_READWRITE`). Hidden from read-only keys and rejected with `403`.
 
 ---
 
 ## tdx-cmdb-update
-**Status:** 🔴 DISABLED  
+**Status:** Requires read-write key  
 **Type:** Update (Full)
 
 Fully updates a configuration item (all fields must be provided).
@@ -705,12 +696,12 @@ Fully updates a configuration item (all fields must be provided).
 - `id` (integer, required) - CI ID
 - `data` (object, required) - Full CI data with PascalCase TDX field names
 
-**Status:** Modification tools disabled for safety. Enable via `ALLOW_MODIFICATIONS=true` environment variable only in authorized environments.
+**Status:** Requires a read-write API key (`MCP_API_KEY_READWRITE`). Hidden from read-only keys and rejected with `403`.
 
 ---
 
 ## tdx-cmdb-delete
-**Status:** 🔴 DISABLED  
+**Status:** Requires read-write key  
 **Type:** Delete
 
 Deletes a configuration item.
@@ -718,12 +709,12 @@ Deletes a configuration item.
 **Parameters:**
  - `id` (integer, required) - CI ID
 
-**Status:** Modification tools disabled for safety. Enable via `ALLOW_MODIFICATIONS=true` environment variable only in authorized environments.
+**Status:** Requires a read-write API key (`MCP_API_KEY_READWRITE`). Hidden from read-only keys and rejected with `403`.
 
 ---
 
 ## tdx-cmdb-feed-add
-**Status:** 🔴 DISABLED  
+**Status:** Requires read-write key  
 **Type:** Feed/Comment
 
 Adds a comment/note to a CI's activity feed.
@@ -734,12 +725,12 @@ Adds a comment/note to a CI's activity feed.
 - `isPrivate` (boolean, optional) - Whether the comment is private (default: false)
 - `notify` (string[], optional) - UIDs of people to notify
 
-**Status:** Modification tools disabled for safety. Enable via `ALLOW_MODIFICATIONS=true` environment variable only in authorized environments.
+**Status:** Requires a read-write API key (`MCP_API_KEY_READWRITE`). Hidden from read-only keys and rejected with `403`.
 
 ---
 
 ## tdx-cmdb-add-relationship
-**Status:** 🔴 DISABLED  
+**Status:** Requires read-write key  
 **Type:** Link/Association
 
 Adds a relationship/dependency between two configuration items.
@@ -750,14 +741,13 @@ Adds a relationship/dependency between two configuration items.
 - `typeId` (integer, required) - Relationship type ID
 - `isInverse` (boolean, optional) - Whether this is an inverse relationship
 
-**Status:** Modification tools disabled for safety. Enable via `ALLOW_MODIFICATIONS=true` environment variable only in authorized environments.
+**Status:** Requires a read-write API key (`MCP_API_KEY_READWRITE`). Hidden from read-only keys and rejected with `403`.
 
 ---
 
 # KNOWLEDGE BASE
 
 ## tdx-kb-get
-**Status:** ✅ ENABLED  
 **Type:** Read-only / Get
 
 Retrieves a knowledge base article by ID.
@@ -796,7 +786,6 @@ Retrieves a knowledge base article by ID.
 ---
 
 ## tdx-kb-search
-**Status:** ✅ ENABLED  
 **Type:** Read-only / Search
 
 Searches knowledge base articles with multiple filter options. All filters combine with AND logic.
@@ -839,7 +828,7 @@ Searches knowledge base articles with multiple filter options. All filters combi
 ---
 
 ## tdx-kb-create
-**Status:** 🔴 DISABLED  
+**Status:** Requires read-write key  
 **Type:** Create
 
 Creates a new knowledge base article.
@@ -858,12 +847,12 @@ Creates a new knowledge base article.
 - `attributes` (array, optional) - Custom attributes with id and value
 - `appId` (integer, optional) - Application ID (defaults to TDX_KB_APP_ID or TDX_APP_ID)
 
-**Status:** Modification tools disabled for safety. Enable via `ALLOW_MODIFICATIONS=true` environment variable only in authorized environments.
+**Status:** Requires a read-write API key (`MCP_API_KEY_READWRITE`). Hidden from read-only keys and rejected with `403`.
 
 ---
 
 ## tdx-kb-update
-**Status:** 🔴 DISABLED  
+**Status:** Requires read-write key  
 **Type:** Update (Full)
 
 Fully updates a knowledge base article.
@@ -873,12 +862,12 @@ Fully updates a knowledge base article.
 - `data` (object, required) - Article data with PascalCase TDX field names
 - `appId` (integer, optional) - Application ID (defaults to TDX_KB_APP_ID or TDX_APP_ID)
 
-**Status:** Modification tools disabled for safety. Enable via `ALLOW_MODIFICATIONS=true` environment variable only in authorized environments.
+**Status:** Requires a read-write API key (`MCP_API_KEY_READWRITE`). Hidden from read-only keys and rejected with `403`.
 
 ---
 
 ## tdx-kb-delete
-**Status:** 🔴 DISABLED  
+**Status:** Requires read-write key  
 **Type:** Delete
 
 Deletes a knowledge base article.
@@ -887,14 +876,13 @@ Deletes a knowledge base article.
 - `id` (integer, required) - KB article ID
 - `appId` (integer, optional) - Application ID (defaults to TDX_KB_APP_ID or TDX_APP_ID)
 
-**Status:** Modification tools disabled for safety. Enable via `ALLOW_MODIFICATIONS=true` environment variable only in authorized environments.
+**Status:** Requires a read-write API key (`MCP_API_KEY_READWRITE`). Hidden from read-only keys and rejected with `403`.
 
 ---
 
 # PROJECTS
 
 ## tdx-project-get
-**Status:** ✅ ENABLED  
 **Type:** Read-only / Get
 
 Retrieves project details by ID.
@@ -933,7 +921,6 @@ Retrieves project details by ID.
 ---
 
 ## tdx-project-search
-**Status:** ✅ ENABLED  
 **Type:** Read-only / Search
 
 Searches projects with multiple filter options. All filters combine with AND logic.
@@ -982,7 +969,7 @@ Searches projects with multiple filter options. All filters combine with AND log
 ---
 
 ## tdx-project-create
-**Status:** 🔴 DISABLED  
+**Status:** Requires read-write key  
 **Type:** Create
 
 Creates a new project.
@@ -1000,12 +987,12 @@ Creates a new project.
 - `estimatedHours` (number, optional) - Estimated hours
 - `attributes` (array, optional) - Custom attributes with id and value
 
-**Status:** Modification tools disabled for safety. Enable via `ALLOW_MODIFICATIONS=true` environment variable only in authorized environments.
+**Status:** Requires a read-write API key (`MCP_API_KEY_READWRITE`). Hidden from read-only keys and rejected with `403`.
 
 ---
 
 ## tdx-project-update
-**Status:** 🔴 DISABLED  
+**Status:** Requires read-write key  
 **Type:** Update (Full)
 
 Fully updates a project.
@@ -1014,14 +1001,13 @@ Fully updates a project.
 - `id` (integer, required) - Project ID
 - `data` (object, required) - Project data with PascalCase TDX field names
 
-**Status:** Modification tools disabled for safety. Enable via `ALLOW_MODIFICATIONS=true` environment variable only in authorized environments.
+**Status:** Requires a read-write API key (`MCP_API_KEY_READWRITE`). Hidden from read-only keys and rejected with `403`.
 
 ---
 
 # PEOPLE
 
 ## tdx-people-get
-**Status:** ✅ ENABLED  
 **Type:** Read-only / Get
 
 Retrieves a person/user by UID.
@@ -1058,7 +1044,6 @@ Retrieves a person/user by UID.
 ---
 
 ## tdx-people-search
-**Status:** ✅ ENABLED  
 **Type:** Read-only / Search
 
 Searches for people with multiple filter options. All filters combine with AND logic.
@@ -1103,7 +1088,6 @@ Searches for people with multiple filter options. All filters combine with AND l
 ---
 
 ## tdx-people-lookup
-**Status:** ✅ ENABLED  
 **Type:** Read-only / Quick Lookup
 
 Quick lookup of a person by name, email, or username.
@@ -1119,7 +1103,7 @@ Quick lookup of a person by name, email, or username.
 ---
 
 ## tdx-people-update
-**Status:** 🔴 DISABLED  
+**Status:** Requires read-write key  
 **Type:** Update (Full)
 
 Fully updates a person/user profile.
@@ -1128,14 +1112,13 @@ Fully updates a person/user profile.
 - `uid` (string, required) - Person UID
 - `data` (object, required) - Person data with PascalCase TDX field names
 
-**Status:** Modification tools disabled for safety. Enable via `ALLOW_MODIFICATIONS=true` environment variable only in authorized environments.
+**Status:** Requires a read-write API key (`MCP_API_KEY_READWRITE`). Hidden from read-only keys and rejected with `403`.
 
 ---
 
 # ACCOUNTS
 
 ## tdx-account-get
-**Status:** ✅ ENABLED  
 **Type:** Read-only / Get
 
 Retrieves an account/department by ID.
@@ -1174,7 +1157,6 @@ Retrieves an account/department by ID.
 ---
 
 ## tdx-account-search
-**Status:** ✅ ENABLED  
 **Type:** Read-only / Search
 
 Searches accounts/departments with filter options. All filters combine with AND logic.
@@ -1217,7 +1199,6 @@ Searches accounts/departments with filter options. All filters combine with AND 
 # GROUPS
 
 ## tdx-group-get
-**Status:** ✅ ENABLED  
 **Type:** Read-only / Get
 
 Retrieves a group by ID.
@@ -1242,7 +1223,6 @@ Retrieves a group by ID.
 ---
 
 ## tdx-group-search
-**Status:** ✅ ENABLED  
 **Type:** Read-only / Search
 
 Searches for groups with filter options. All filters combine with AND logic.
@@ -1272,7 +1252,6 @@ Searches for groups with filter options. All filters combine with AND logic.
 # STATUSES
 
 ## tdx-statuses-get
-**Status:** ✅ ENABLED  
 **Type:** Read-only / Metadata
 
 Retrieves available statuses for a specific TDX component type.
@@ -1305,7 +1284,6 @@ Retrieves available statuses for a specific TDX component type.
 # TICKET TYPES
 
 ## tdx-ticket-types-get
-**Status:** ✅ ENABLED  
 **Type:** Read-only / Metadata
 
 Looks up ticket types for a ticketing application. Call with no parameters to list all types, with `id` to fetch one type, or with `name` to filter the list by a case-insensitive name substring.
@@ -1337,7 +1315,6 @@ Looks up ticket types for a ticketing application. Call with no parameters to li
 # CUSTOM ATTRIBUTES
 
 ## tdx-attributes-get
-**Status:** ✅ ENABLED  
 **Type:** Read-only / Metadata
 
 Retrieves custom attribute definitions for a TDX component type.
@@ -1395,7 +1372,7 @@ Retrieves custom attribute definitions for a TDX component type.
 
 **Feed Pattern:**
 - `tdx-*-feed-get` tools retrieve activity history/comments
-- `tdx-*-feed-add` tools add new comments (disabled by default)
+- `tdx-*-feed-add` tools add new comments (require a read-write key)
 - Useful for audit trails and change tracking
 
 **Metadata Pattern:**

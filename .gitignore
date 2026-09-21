@@ -36,8 +36,10 @@ app-logs/
 tdx-mcp.service
 .mcpserver
 .azure/
-infra/
 docker/
+
+# Compiled ARM output from infra/main.bicep
+infra/main.json
 
 # Test & Query Scripts
 /tests
