@@ -234,24 +234,19 @@ curl -X POST \
 ```
 
 ### Response Format
+The MCP JSON-RPC response is returned unchanged. Tool results arrive as JSON encoded
+into the `text` field, so callers parse `result.content[0].text` a second time.
 ```json
 {
-  "success": true,
-  "type": "entity-type",
-  "timestamp": "2026-06-26T10:00:00.000Z",
-  "tool": "tool-name",
-  "data": [
-    // Result data
-  ],
-  "meta": {
-    "count": 1,
-    "resultType": "array",
-    "query": {
-      // Original query parameters
-    }
-  },
-  "_raw": {
-    // Raw MCP response
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "[{\"ID\":123,\"Title\":\"Example ticket\"}]"
+      }
+    ]
   }
 }
 ```

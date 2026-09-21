@@ -19,6 +19,8 @@ export interface TdxClientOptions {
   retryBudgetMs?: number;
   /** Injected by tests so retry waits cost no wall-clock time. */
   sleep?: (ms: number) => Promise<void>;
+  /** Re-reads credentials after a 401; defaults to loadConfig. Injected by tests. */
+  reloadConfig?: () => Promise<TdxConfig>;
 }
 
 export class TdxClient {
@@ -35,7 +37,7 @@ export class TdxClient {
   private readonly sleep: (ms: number) => Promise<void>;
 
   constructor(config: TdxConfig, options: TdxClientOptions = {}) {
-    this.auth = new TdxAuth(config);
+    this.auth = new TdxAuth(config, options.reloadConfig);
     this.baseUrl = config.baseUrl;
     this.appId = config.appId;
     this.assetsAppId = config.assetsAppId;
@@ -125,11 +127,12 @@ export class TdxClient {
   }
 
   /**
-   * Performs the call, retrying only on 429.
+   * Performs the call, retrying only on 429 and once on 401.
    *
    * A 429 means TDX rejected the request without executing it, so replaying it is safe even
-   * for writes. Every other failure -- including 5xx -- is returned untouched: the server may
-   * well have applied the change, and retrying it could duplicate a ticket or an asset.
+   * for writes. A 401 is the same -- TDX never reached the handler. Every other failure --
+   * including 5xx -- is returned untouched: the server may well have applied the change, and
+   * retrying it could duplicate a ticket or an asset.
    */
   private async fetchWithRateLimitRetry(
     method: string,
@@ -140,8 +143,10 @@ export class TdxClient {
     deadline: number
   ): Promise<Response> {
     let snapshot: RateLimitSnapshot = {};
+    let attempt = 1;
+    let triedReauth = false;
 
-    for (let attempt = 1; ; attempt++) {
+    for (;;) {
       const token = await this.auth.getToken();
       console.error(`[TDX Client] Token obtained in ${Date.now() - startTime}ms`);
 
@@ -163,6 +168,16 @@ export class TdxClient {
       snapshot = parseRateLimitHeaders(res.headers);
       if (snapshot.remaining !== undefined && snapshot.remaining <= 2) {
         console.error(`[TDX Client] ⚠️ Approaching TDX limit: ${describeRateLimit(snapshot)}`);
+      }
+
+      // Deliberately does not consume an attempt: re-auth is orthogonal to the throttle budget.
+      if (res.status === 401 && !triedReauth) {
+        triedReauth = true;
+        if (await this.auth.recoverFromUnauthorized(fetchStart)) {
+          await res.text().catch(() => ""); // Drain so the socket can be reused for the replay.
+          console.error(`[TDX Client] 🔑 HTTP 401 on ${method} ${path}; re-authenticated, replaying once`);
+          continue;
+        }
       }
 
       if (res.status !== 429) {
@@ -201,6 +216,7 @@ export class TdxClient {
         `waiting ${waitMs}ms -- ${describeRateLimit(snapshot)}`
       );
       await this.sleep(waitMs);
+      attempt++;
     }
   }
 

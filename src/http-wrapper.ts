@@ -18,6 +18,7 @@ import { PerKeyQuota } from './per-key-quota.js';
 import { loadRateLimiterConfig } from './rate-limit-config.js';
 import { canAccessTool, getToolAccessLevel, filterToolsByAccessLevel, type AccessLevel } from './tool-access-config.js';
 import { McpTransport, RequestTimeoutError } from './mcp-transport.js';
+import { RestartPolicy } from './restart-policy.js';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -298,74 +299,48 @@ function corsHeaders(origin: string | undefined): Record<string, string> {
   return headers;
 }
 
-/**
- * Transform MCP responses into agent-friendly format
- */
-function transformMCPResponse(mcpResponse, requestMessage) {
-  try {
-    if (!mcpResponse) {
-      return mcpResponse;
-    }
-
-    const result = mcpResponse.result || mcpResponse;
-    if (!result || !result.content) {
-      return mcpResponse;
-    }
-
-    const content = result.content;
-    if (!Array.isArray(content) || content.length === 0) {
-      return mcpResponse;
-    }
-
-    const firstContent = content[0];
-    const textContent = firstContent.text || (typeof firstContent === 'string' ? firstContent : null);
-    
-    if (!textContent) {
-      return mcpResponse;
-    }
-
-    let parsedData;
-    try {
-      parsedData = JSON.parse(textContent);
-    } catch (e) {
-      return mcpResponse;
-    }
-
-    const toolName = requestMessage?.params?.name || 'unknown';
-    const itemCount = Array.isArray(parsedData) ? parsedData.length : 1;
-
-    return {
-      success: true,
-      type: 'tool-result',
-      tool: toolName,
-      data: parsedData,
-      meta: {
-        count: itemCount,
-        resultType: Array.isArray(parsedData) ? 'array' : 'object',
-      },
-      _raw: mcpResponse
-    };
-  } catch (err) {
-    console.error(`[Transform] Error: ${(err as Error).message}`);
-    return mcpResponse;
-  }
-}
-
 // Single persistent MCP process
 let globalMcpProcess: any = null;
-let mcpRestartCount = 0;
 const MAX_RESTART_ATTEMPTS = 5;
-const RESTART_DELAY = 2000; // 2 seconds
+const RESTART_WINDOW_MS = 10 * 60 * 1000;
+const RESTART_BASE_DELAY_MS = 2000;
+const RESTART_MAX_DELAY_MS = 30_000;
+
+const restartPolicy = new RestartPolicy(
+  MAX_RESTART_ATTEMPTS,
+  RESTART_WINDOW_MS,
+  RESTART_BASE_DELAY_MS,
+  RESTART_MAX_DELAY_MS
+);
+
+/** Spawning is lazy and per-request, so an exhausted budget recovers once the window clears. */
+function scheduleRestart() {
+  if (restartPolicy.exhausted()) {
+    console.error(
+      `[MCP] ❌ ${restartPolicy.recentCrashes} crashes within ${RESTART_WINDOW_MS / 60000} minutes; ` +
+      `not restarting until the window clears.`
+    );
+    return;
+  }
+
+  const delay = restartPolicy.nextDelayMs();
+  console.log(`[MCP] Will attempt to restart in ${delay}ms...`);
+  setTimeout(() => {
+    if (!globalMcpProcess) {
+      getOrCreateMCPProcess();
+    }
+  }, delay);
+}
 
 function getOrCreateMCPProcess() {
   if (globalMcpProcess && !globalMcpProcess.killed) {
     return globalMcpProcess;
   }
 
-  console.log(`[MCP] Spawning new persistent MCP process... (restart count: ${mcpRestartCount})`);
+  console.log(`[MCP] Spawning new persistent MCP process... (recent crashes: ${restartPolicy.recentCrashes})`);
   
-  if (mcpRestartCount >= MAX_RESTART_ATTEMPTS) {
-    console.error(`[MCP] ❌ FATAL: Max restart attempts (${MAX_RESTART_ATTEMPTS}) exceeded. MCP process is crashing repeatedly.`);
+  if (restartPolicy.exhausted()) {
+    console.error(`[MCP] ❌ FATAL: ${MAX_RESTART_ATTEMPTS} crashes within ${RESTART_WINDOW_MS / 60000} minutes. MCP process is crashing repeatedly.`);
     console.error('[MCP] Check:');
     console.error('  1. TDX_BASE_URL, TDX_BEID, TDX_WEB_SERVICES_KEY are set correctly');
     console.error('  2. TDX API is accessible from this container');
@@ -391,16 +366,11 @@ function getOrCreateMCPProcess() {
 
   proc.on('error', (err) => {
     console.error(`[MCP] Process error: ${err.message}`);
-    mcpRestartCount++;
+    restartPolicy.recordCrash();
     globalMcpProcess = null;
     transport.detach();
     transport.failAllPending(new Error(`MCP process error: ${err.message}`));
-    console.log(`[MCP] Will attempt to restart in ${RESTART_DELAY}ms...`);
-    setTimeout(() => {
-      if (!globalMcpProcess) {
-        getOrCreateMCPProcess();
-      }
-    }, RESTART_DELAY);
+    scheduleRestart();
   });
 
   proc.on('close', (code) => {
@@ -408,20 +378,13 @@ function getOrCreateMCPProcess() {
     transport.detach();
     transport.failAllPending(new Error(`MCP process exited with code ${code}`));
     if (code !== 0) {
-      mcpRestartCount++;
+      restartPolicy.recordCrash();
       globalMcpProcess = null;
-      console.log(`[MCP] Restart count: ${mcpRestartCount}/${MAX_RESTART_ATTEMPTS}`);
-      if (mcpRestartCount < MAX_RESTART_ATTEMPTS) {
-        console.log(`[MCP] Will attempt to restart in ${RESTART_DELAY}ms...`);
-        setTimeout(() => {
-          if (!globalMcpProcess) {
-            getOrCreateMCPProcess();
-          }
-        }, RESTART_DELAY);
-      }
+      console.log(`[MCP] Recent crashes: ${restartPolicy.recentCrashes}/${MAX_RESTART_ATTEMPTS}`);
+      scheduleRestart();
     } else {
       console.log('[MCP] Process exited cleanly (code 0)');
-      mcpRestartCount = 0;
+      restartPolicy.reset();
       globalMcpProcess = null;
     }
   });
@@ -654,7 +617,7 @@ const server = http.createServer((req, res) => {
       body += chunk.toString();
       if (body.length > 1e6) {
         console.error('[HTTP] Request too large, closing connection');
-        req.connection.destroy();
+        req.destroy();
       }
     });
 
