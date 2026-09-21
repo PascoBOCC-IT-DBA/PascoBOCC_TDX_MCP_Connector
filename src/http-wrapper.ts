@@ -17,15 +17,7 @@ import { RateLimiter } from './rate-limiter.js';
 import { PerKeyQuota } from './per-key-quota.js';
 import { loadRateLimiterConfig } from './rate-limit-config.js';
 import { canAccessTool, getToolAccessLevel, filterToolsByAccessLevel, type AccessLevel } from './tool-access-config.js';
-
-type JsonRpcId = string | number;
-
-interface JsonRpcResponse {
-  jsonrpc?: string;
-  id?: JsonRpcId;
-  result?: { tools?: Array<{ name?: string }>; content?: unknown } & Record<string, unknown>;
-  error?: unknown;
-}
+import { McpTransport, RequestTimeoutError } from './mcp-transport.js';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -363,6 +355,8 @@ function getOrCreateMCPProcess() {
     console.error(`[MCP] Process error: ${err.message}`);
     mcpRestartCount++;
     globalMcpProcess = null;
+    transport.detach();
+    transport.failAllPending(new Error(`MCP process error: ${err.message}`));
     console.log(`[MCP] Will attempt to restart in ${RESTART_DELAY}ms...`);
     setTimeout(() => {
       if (!globalMcpProcess) {
@@ -373,6 +367,8 @@ function getOrCreateMCPProcess() {
 
   proc.on('close', (code) => {
     console.error(`[MCP] ❌ Process closed with exit code ${code}`);
+    transport.detach();
+    transport.failAllPending(new Error(`MCP process exited with code ${code}`));
     if (code !== 0) {
       mcpRestartCount++;
       globalMcpProcess = null;
@@ -402,66 +398,7 @@ function getOrCreateMCPProcess() {
   return proc;
 }
 
-// Pending requests map
-const pendingRequests = new Map<JsonRpcId, {
-  resolve: (data: any) => void;
-  reject: (err: Error) => void;
-  timeout: NodeJS.Timeout;
-}>();
-
-// Stdout listener state
-let stdoutListenerAttached = false;
-
-function ensureStdoutListener() {
-  if (stdoutListenerAttached) return;
-  
-  const proc = getOrCreateMCPProcess();
-  let buffer = '';
-  let initMarkerSeen = false;
-
-  console.log(`[MCP] Attaching stdout listener to process PID: ${proc.pid}`);
-
-  proc.stdout.on('data', (data: Buffer) => {
-    const dataStr = data.toString();
-    console.log(`[MCP] stdout (${data.length} bytes): ${dataStr.substring(0, 200)}`);
-    buffer += dataStr;
-    
-    // Check for initialization marker
-    if (!initMarkerSeen && buffer.includes('[MCP Server Ready]')) {
-      console.log(`[MCP] ✓ Detected MCP initialization complete`);
-      initMarkerSeen = true;
-    }
-    
-    const lines = buffer.split('\n');
-    
-    for (let i = 0; i < lines.length - 1; i++) {
-      const line = lines[i].trim();
-      if (!line) continue;
-      
-      // Try to parse as JSON
-      if (line.startsWith('{')) {
-        try {
-          const msg = JSON.parse(line);
-          console.log(`[MCP] Received JSON-RPC response with id: ${msg.id}`);
-          
-          if (Object.prototype.hasOwnProperty.call(msg, 'id') && pendingRequests.has(msg.id)) {
-            const req = pendingRequests.get(msg.id)!;
-            pendingRequests.delete(msg.id);
-            clearTimeout(req.timeout);
-            req.resolve(msg);
-          }
-        } catch (e) {
-          console.log(`[MCP] Failed to parse line as JSON: ${line.substring(0, 100)}`);
-        }
-      }
-    }
-    
-    buffer = lines[lines.length - 1];
-  });
-
-  console.log(`[MCP] stdout listener attached successfully`);
-  stdoutListenerAttached = true;
-}
+const transport = new McpTransport();
 
 // Handle MCP JSON-RPC requests
 async function handleMcpRequest(message, res, caller?: Caller) {
@@ -510,7 +447,6 @@ async function handleMcpRequest(message, res, caller?: Caller) {
     }
   }
   
-  ensureStdoutListener();
   const proc = getOrCreateMCPProcess();
   
   if (!proc || proc.killed) {
@@ -520,23 +456,10 @@ async function handleMcpRequest(message, res, caller?: Caller) {
     return;
   }
 
-  const requestId: JsonRpcId = message.id;
-  const timeout = setTimeout(() => {
-    if (pendingRequests.has(requestId)) {
-      console.error(`[Handler] Request ${requestId} timeout after ${timeoutMs}ms (method: ${methodName})`);
-      pendingRequests.delete(requestId);
-      if (!res.headersSent) {
-        res.writeHead(504, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: `Request timeout (${timeoutMs / 1000}s)`, method: methodName }));
-      }
-    }
-  }, timeoutMs);
+  console.log(`[Handler] Sending to MCP process (PID: ${proc.pid}, method: ${methodName}, timeout: ${timeoutMs}ms)`);
 
-  const promise = new Promise<JsonRpcResponse>((resolve, reject) => {
-    pendingRequests.set(requestId, { resolve, reject, timeout });
-  });
-
-  promise.then((mcpResponse) => {
+  try {
+    const mcpResponse = await transport.send(proc, message, timeoutMs);
     if (!res.headersSent) {
       // Filter tool list by API key access level, so a read-only key never sees write tools
       const tools = mcpResponse?.result?.tools;
@@ -549,35 +472,14 @@ async function handleMcpRequest(message, res, caller?: Caller) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(mcpResponse));
     }
-  }).catch((err) => {
-    if (!res.headersSent) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Internal error', details: (err as Error).message }));
-    }
-  });
-
-  // Send the request
-  try {
-    const msgStr = JSON.stringify(message) + '\n';
-    console.log(`[Handler] Sending to MCP process (PID: ${proc.pid}, timeout: ${timeoutMs}ms): ${msgStr.substring(0, 100)}`);
-    proc.stdin.write(msgStr, (err) => {
-      if (err) {
-        console.error(`[Handler] Write error: ${err.message}`);
-        clearTimeout(timeout);
-        pendingRequests.delete(requestId);
-        if (!res.headersSent) {
-          res.writeHead(500, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Failed to write to MCP' }));
-        }
-      }
-    });
   } catch (err) {
-    console.error(`[Handler] Write exception: ${err}`);
-    clearTimeout(timeout);
-    pendingRequests.delete(requestId);
+    const isTimeout = err instanceof RequestTimeoutError;
+    console.error(`[Handler] ${methodName} failed: ${(err as Error).message}`);
     if (!res.headersSent) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Write exception', details: (err as Error).message }));
+      res.writeHead(isTimeout ? 504 : 500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(isTimeout
+        ? { error: (err as Error).message, method: methodName }
+        : { error: 'Internal error' }));
     }
   }
 }

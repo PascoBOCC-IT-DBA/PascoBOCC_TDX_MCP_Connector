@@ -17,6 +17,7 @@ export interface MaxResultsLimits {
   withoutFilter: number;   // Max results when no filters
   counts: number;          // Max tickets echoed back in the count tool's preview array
   countScan: number;       // Max tickets the count tool asks TDX for when computing the count
+  absoluteMax: number;     // Hard ceiling on any caller-supplied maxResults
 }
 
 /**
@@ -128,5 +129,19 @@ export function loadMaxResultsLimits(): MaxResultsLimits {
     // Counts tool scan ceiling: only ticket IDs are counted, so this can be far larger
     // than the preview limit without risking a large MCP response.
     countScan: parseInt(process.env.TDX_MAX_RESULTS_COUNT_SCAN || '10000', 10),
+    // Ceiling applied to maxResults values supplied by the caller, not to the defaults above.
+    absoluteMax: parseInt(process.env.TDX_MAX_RESULTS_ABSOLUTE || '1000', 10),
   };
+}
+
+/**
+ * The limits above are only defaults, so an explicit maxResults would otherwise bypass them
+ * entirely and let a single call pull an unbounded result set into one MCP response.
+ * Operator-configured fallbacks are trusted and passed through unclamped.
+ */
+export function clampMaxResults(requested: number | undefined, fallback: number): number {
+  if (requested === undefined || !Number.isFinite(requested) || requested < 1) {
+    return fallback;
+  }
+  return Math.min(Math.floor(requested), loadMaxResultsLimits().absoluteMax);
 }

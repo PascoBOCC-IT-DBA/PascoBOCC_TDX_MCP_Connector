@@ -137,3 +137,39 @@ test("a 5xx is never retried, because the write may already have landed", async 
     assert.equal(calls.count, 1);
   });
 });
+
+test("an app ID this server was not configured for never reaches TDX", async () => {
+  const client = new TdxClient({ ...config, appId: 1, assetsAppId: 2 });
+
+  await withFetch([{ status: 200, body: "[]" }], async (calls) => {
+    await assert.rejects(
+      () => client.get("/99/tickets/123"),
+      (err: unknown) => {
+        assert.match((err as Error).message, /appId 99 is not a configured TDX application/);
+        return true;
+      }
+    );
+
+    assert.equal(calls.count, 0, "the request must be refused before it is sent");
+  });
+});
+
+test("every configured app ID is reachable", async () => {
+  const client = new TdxClient({ ...config, appId: 1, assetsAppId: 2, kbAppId: 3 });
+
+  await withFetch([{ status: 200, body: "{}" }], async () => {
+    for (const appId of [1, 2, 3]) {
+      await client.get(`/${appId}/tickets/1`);
+    }
+  });
+});
+
+test("paths that are not app-scoped are left alone", async () => {
+  const client = new TdxClient(config);
+
+  await withFetch([{ status: 200, body: "[]" }], async (calls) => {
+    await client.post("/people/search", {});
+    assert.equal(calls.count, 1);
+  });
+});
+

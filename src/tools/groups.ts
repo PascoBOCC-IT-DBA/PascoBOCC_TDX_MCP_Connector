@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { TdxClient } from "../tdx-client.js";
+import { clampMaxResults } from "../config.js";
 
 export function registerGroupTools(server: McpServer, client: TdxClient) {
   server.tool(
@@ -26,7 +27,7 @@ export function registerGroupTools(server: McpServer, client: TdxClient) {
       searchText: z.string().optional().describe("Full-text search query"),
       isActive: z.boolean().optional().describe("Filter by active status"),
       hasAppId: z.number().optional().describe("Filter by associated app ID"),
-      maxResults: z.number().optional().describe("Max results to return (default 25)"),
+      maxResults: z.number().int().min(1).optional().describe("Max results to return (default 25, capped by server limit)"),
     },
     async (params) => {
       const body: Record<string, unknown> = {};
@@ -34,7 +35,7 @@ export function registerGroupTools(server: McpServer, client: TdxClient) {
       if (params.isActive !== undefined) body.IsActive = params.isActive;
       if (params.hasAppId !== undefined) body.HasAppID = params.hasAppId;
       // Always cap MaxResults - TDX returns the entire unfiltered set if a filter is ignored/unmatched
-      body.MaxResults = params.maxResults ?? 25;
+      body.MaxResults = clampMaxResults(params.maxResults, 25);
       try {
         const result = await client.post("/groups/search", body);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };

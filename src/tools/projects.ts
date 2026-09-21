@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { TdxClient } from "../tdx-client.js";
-import { loadMaxResultsLimits } from "../config.js";
+import { clampMaxResults, loadMaxResultsLimits } from "../config.js";
 
 export function registerProjectReadOnlyTools(server: McpServer, client: TdxClient) {
   server.tool(
@@ -34,7 +34,7 @@ export function registerProjectReadOnlyTools(server: McpServer, client: TdxClien
       createdDateEnd: z.string().optional().describe("Filter by created date end (ISO 8601)"),
       startsDateStart: z.string().optional().describe("Filter by project start date start (ISO 8601)"),
       startsDateEnd: z.string().optional().describe("Filter by project start date end (ISO 8601)"),
-      maxResults: z.number().optional().describe("Max results to return (smart default: 5000 with date filters, 100 otherwise)"),
+      maxResults: z.number().int().min(1).optional().describe("Max results to return (smart default: 300 with date filters, 50 otherwise; capped by server limit)"),
     },
     async (params) => {
       const body: Record<string, unknown> = {};
@@ -51,7 +51,7 @@ export function registerProjectReadOnlyTools(server: McpServer, client: TdxClien
       const hasDateFilter = params.createdDateStart !== undefined || params.createdDateEnd !== undefined || params.startsDateStart !== undefined || params.startsDateEnd !== undefined;
       const limits = loadMaxResultsLimits();
       const defaultMaxResults = hasDateFilter ? limits.withFilter : limits.withoutFilter;
-      body.MaxResults = params.maxResults ?? defaultMaxResults;
+      body.MaxResults = clampMaxResults(params.maxResults, defaultMaxResults);
       try {
         const result = await client.post("/projects/search", body);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };

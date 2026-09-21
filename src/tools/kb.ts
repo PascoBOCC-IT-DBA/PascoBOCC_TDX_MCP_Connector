@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { TdxClient } from "../tdx-client.js";
+import { clampMaxResults } from "../config.js";
 
 export function registerKbReadOnlyTools(server: McpServer, client: TdxClient) {
   const defaultAppId = client.kbAppId ?? client.appId;
@@ -32,7 +33,7 @@ export function registerKbReadOnlyTools(server: McpServer, client: TdxClient) {
       categoryIds: z.array(z.number()).optional().describe("Filter by category IDs"),
       status: z.number().optional().describe("Filter by status (0=None, 1=Draft, 2=Approved, 3=Archived)"),
       ownerUids: z.array(z.string()).optional().describe("Filter by owner UIDs"),
-      maxResults: z.number().optional().describe("Max results to return (default 25)"),
+      maxResults: z.number().int().min(1).optional().describe("Max results to return (default 25, capped by server limit)"),
     },
     async (params) => {
       const app = params.appId ?? defaultAppId;
@@ -42,7 +43,7 @@ export function registerKbReadOnlyTools(server: McpServer, client: TdxClient) {
       if (params.status !== undefined) body.Status = params.status;
       if (params.ownerUids !== undefined) body.OwnerUids = params.ownerUids;
       // Always cap MaxResults - TDX returns the entire unfiltered set if a filter is ignored/unmatched
-      body.MaxResults = params.maxResults ?? 25;
+      body.MaxResults = clampMaxResults(params.maxResults, 25);
       try {
         const result = await client.post(`/${app}/knowledgebase/search`, body);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };

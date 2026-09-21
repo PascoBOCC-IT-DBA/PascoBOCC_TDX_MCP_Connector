@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { TdxClient } from "../tdx-client.js";
-import { loadMaxResultsLimits } from "../config.js";
+import { clampMaxResults, loadMaxResultsLimits } from "../config.js";
 import { filterByResponsibleUid } from "./ticket-filters.js";
 
 // Ticket count tool (always registered)
@@ -36,7 +36,7 @@ export function registerTicketCountTools(server: McpServer, client: TdxClient) {
       closedDateEnd: z.string().optional().describe("Filter by closed date end (ISO 8601 format)"),
       respondedDateStart: z.string().optional().describe("Filter by responded date start (ISO 8601 format)"),
       respondedDateEnd: z.string().optional().describe("Filter by responded date end (ISO 8601 format)"),
-      maxSummaryResults: z.number().optional().describe("Max tickets to include in the preview array (default: 200). Does NOT affect the returned count"),
+      maxSummaryResults: z.number().int().min(1).optional().describe("Max tickets to include in the preview array (default: 100, capped by server limit). Does NOT affect the returned count"),
     },
     async (params) => {
       const app = params.appId ?? defaultAppId;
@@ -77,7 +77,10 @@ export function registerTicketCountTools(server: McpServer, client: TdxClient) {
                             params.closedDateStart !== undefined || params.closedDateEnd !== undefined ||
                             params.respondedDateStart !== undefined || params.respondedDateEnd !== undefined;
       const limits = loadMaxResultsLimits();
-      const previewLimit = params.maxSummaryResults ?? (hasDateFilter ? limits.counts : Math.floor(limits.counts / 2));
+      const previewLimit = clampMaxResults(
+        params.maxSummaryResults,
+        hasDateFilter ? limits.counts : Math.floor(limits.counts / 2)
+      );
 
       // The count must reflect every match, so the API request is capped by the scan
       // ceiling rather than by how many tickets we echo back in the preview.

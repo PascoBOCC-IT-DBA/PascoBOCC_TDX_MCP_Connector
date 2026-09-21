@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { TdxClient } from "../tdx-client.js";
-import { loadMaxResultsLimits } from "../config.js";
+import { clampMaxResults, loadMaxResultsLimits } from "../config.js";
 
 export function registerAssetReadOnlyTools(server: McpServer, client: TdxClient) {
   const defaultAppId = client.assetsAppId ?? client.appId;
@@ -42,7 +42,7 @@ export function registerAssetReadOnlyTools(server: McpServer, client: TdxClient)
       modifiedDateEnd: z.string().optional().describe("Filter by modification date end (ISO 8601 format)"),
       acquisitionDateStart: z.string().optional().describe("Filter by acquisition date start (ISO 8601 format)"),
       acquisitionDateEnd: z.string().optional().describe("Filter by acquisition date end (ISO 8601 format)"),
-      maxResults: z.number().optional().describe("Max results to return (smart default: 5000 with date filters, 100 otherwise)"),
+      maxResults: z.number().int().min(1).optional().describe("Max results to return (smart default: 300 with date filters, 50 otherwise; capped by server limit)"),
     },
     async (params) => {
       const app = params.appId ?? defaultAppId;
@@ -63,7 +63,7 @@ export function registerAssetReadOnlyTools(server: McpServer, client: TdxClient)
       const hasDateFilter = params.createdDateStart !== undefined || params.createdDateEnd !== undefined || params.modifiedDateStart !== undefined || params.modifiedDateEnd !== undefined || params.acquisitionDateStart !== undefined || params.acquisitionDateEnd !== undefined;
       const limits = loadMaxResultsLimits();
       const defaultMaxResults = hasDateFilter ? limits.withFilter : limits.withoutFilter;
-      body.MaxResults = params.maxResults ?? defaultMaxResults;
+      body.MaxResults = clampMaxResults(params.maxResults, defaultMaxResults);
       try {
         const result = await client.post(`/${app}/assets/search`, body);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };

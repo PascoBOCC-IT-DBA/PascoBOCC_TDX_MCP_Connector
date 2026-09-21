@@ -27,6 +27,8 @@ export class TdxClient {
   public assetsAppId?: number;
   public kbAppId?: number;
 
+  private readonly allowedAppIds: Set<number>;
+
   private readonly maxRateLimitRetries: number;
   private readonly retryBudgetMs: number;
   private readonly sleep: (ms: number) => Promise<void>;
@@ -38,6 +40,12 @@ export class TdxClient {
     this.assetsAppId = config.assetsAppId;
     this.kbAppId = config.kbAppId;
 
+    this.allowedAppIds = new Set(
+      [config.appId, config.assetsAppId, config.kbAppId].filter(
+        (id): id is number => typeof id === "number"
+      )
+    );
+
     this.maxRateLimitRetries =
       options.maxRateLimitRetries ?? DEFAULT_MAX_RATE_LIMIT_RETRIES;
     this.retryBudgetMs =
@@ -47,12 +55,32 @@ export class TdxClient {
       options.sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
   }
 
+  /**
+   * Every tool takes a caller-supplied appId and the TDX admin token can reach any application
+   * in the instance, so without this a read-only key could read apps this server was never
+   * configured to expose. Enforced here rather than per-tool so a new tool cannot omit it.
+   */
+  private assertAppIdAllowed(path: string): void {
+    const firstSegment = path.split("/")[1];
+    if (!firstSegment || !/^\d+$/.test(firstSegment)) {
+      return; // Not an app-scoped path (e.g. /people/search)
+    }
+    const requestedAppId = Number(firstSegment);
+    if (!this.allowedAppIds.has(requestedAppId)) {
+      throw new Error(
+        `appId ${requestedAppId} is not a configured TDX application for this server. ` +
+        `Allowed app IDs: ${[...this.allowedAppIds].join(", ")}.`
+      );
+    }
+  }
+
   async request(
     method: string,
     path: string,
     body?: unknown,
     query?: Record<string, string>
   ): Promise<unknown> {
+    this.assertAppIdAllowed(path);
     console.error(`[TDX Client] ${method} ${path} - getting token...`);
     const startTime = Date.now();
     const deadline = startTime + this.retryBudgetMs;

@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { TdxClient } from "../tdx-client.js";
+import { clampMaxResults } from "../config.js";
 
 export function registerCmdbReadOnlyTools(server: McpServer, client: TdxClient) {
   // CMDB always uses TDAssets application
@@ -31,7 +32,7 @@ export function registerCmdbReadOnlyTools(server: McpServer, client: TdxClient) 
       isActive: z.boolean().optional().describe("Filter by active status"),
       owningDepartmentIds: z.array(z.number()).optional().describe("Filter by owning department IDs"),
       locationIds: z.array(z.number()).optional().describe("Filter by location IDs"),
-      maxResults: z.number().optional().describe("Max results to return (default 25)"),
+      maxResults: z.number().int().min(1).optional().describe("Max results to return (default 25, capped by server limit)"),
     },
     async (params) => {
       const body: Record<string, unknown> = {};
@@ -41,7 +42,7 @@ export function registerCmdbReadOnlyTools(server: McpServer, client: TdxClient) 
       if (params.owningDepartmentIds !== undefined) body.OwningDepartmentIDs = params.owningDepartmentIds;
       if (params.locationIds !== undefined) body.LocationIDs = params.locationIds;
       // Always cap MaxResults - TDX returns the entire unfiltered set if a filter is ignored/unmatched
-      body.MaxResults = params.maxResults ?? 25;
+      body.MaxResults = clampMaxResults(params.maxResults, 25);
       try {
         const result = await client.post(`/${appId}/cmdb/search`, body);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };

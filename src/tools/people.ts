@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { TdxClient } from "../tdx-client.js";
+import { clampMaxResults } from "../config.js";
 
 export function registerPeopleReadOnlyTools(server: McpServer, client: TdxClient) {
   server.tool(
@@ -31,7 +32,7 @@ export function registerPeopleReadOnlyTools(server: McpServer, client: TdxClient
       isActive: z.boolean().optional().describe("Filter by active status"),
       isEmployee: z.boolean().optional().describe("Filter by employee status"),
       accountIds: z.array(z.number()).optional().describe("Filter by account IDs"),
-      maxResults: z.number().optional().describe("Max results to return (default 25)"),
+      maxResults: z.number().int().min(1).optional().describe("Max results to return (default 25, capped by server limit)"),
     },
     async (params) => {
       const body: Record<string, unknown> = {};
@@ -45,7 +46,7 @@ export function registerPeopleReadOnlyTools(server: McpServer, client: TdxClient
       if (params.accountIds !== undefined) body.AccountIDs = params.accountIds;
       // Always cap MaxResults - if TDX ignores/ misapplies a filter (observed with
       // primaryEmail), an uncapped request returns the entire people directory (10MB+).
-      body.MaxResults = params.maxResults ?? 25;
+      body.MaxResults = clampMaxResults(params.maxResults, 25);
       try {
         const result = await client.post("/people/search", body);
         // Trim to essential fields - full person records carry dozens of unused fields
@@ -74,13 +75,13 @@ export function registerPeopleReadOnlyTools(server: McpServer, client: TdxClient
     "Quick lookup of TDX people by search string (name, email, or username)",
     {
       searchText: z.string().describe("Search string (name, email, or username)"),
-      maxResults: z.number().optional().describe("Max results to return (default 10)"),
+      maxResults: z.number().int().min(1).optional().describe("Max results to return (default 10, capped by server limit)"),
     },
     async (params) => {
       const query: Record<string, string> = {
         searchText: params.searchText,
+        maxResults: String(clampMaxResults(params.maxResults, 10)),
       };
-      if (params.maxResults !== undefined) query.maxResults = String(params.maxResults);
       try {
         const result = await client.get("/people/lookup", query);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
