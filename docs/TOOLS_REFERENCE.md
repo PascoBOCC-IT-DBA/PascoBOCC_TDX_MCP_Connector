@@ -1,7 +1,7 @@
 # TeamDynamix MCP Server - Tools Reference
 
 **Total Tools:** 45 tools across 11 categories  
-**Modification Status:** Modification tools (create, update, delete) are DISABLED by default. Enable via `ALLOW_MODIFICATIONS=true` environment variable only in authorized environments.
+**Modification Status:** Modification tools (create, update, delete) require a read-write API key (`MCP_API_KEY_READWRITE`). They are filtered out of tool listings for read-only keys and rejected with `403` on direct calls.
 
 ---
 
@@ -1377,7 +1377,8 @@ Retrieves custom attribute definitions for a TDX component type.
 - `TDX_APP_ID` - Default application ID for tickets, projects, and knowledge base
 - `TDX_ASSETS_APP_ID` - Application ID for assets and CMDB (if different from TDX_APP_ID)
 - `TDX_KB_APP_ID` - Application ID for knowledge base (if different from TDX_APP_ID)
-- `ALLOW_MODIFICATIONS` - Set to "true" to enable create/update/delete operations (disabled by default)
+- `MCP_API_KEY_READONLY` - API key granting access to read-only tools only
+- `MCP_API_KEY_READWRITE` - API key granting access to all tools, including create/update/delete
 
 ### Common Patterns
 

@@ -147,9 +147,11 @@ function initializeRateLimiter() {
       }
     }, 30000);
   } catch (err) {
-    console.error(`[Startup] Failed to initialize rate limiter: ${err}`);
-    rateLimiter = null;
-    perKeyQuota = null;
+    // The limiter exists to protect TDX's own budget, so serving traffic without it
+    // would silently exceed the upstream limit. Fail closed like the auth checks do.
+    console.error('[Startup] FATAL: Failed to initialize rate limiter:', err);
+    console.error('[Startup] Refusing to start - set TDX_RATE_LIMIT_ENABLED=false to run without it deliberately.');
+    process.exit(1);
   }
 }
 

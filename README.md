@@ -30,12 +30,12 @@ The server uses a **safety-by-default architecture** that separates read-only to
   - No data changes, safe for exploration and analysis
   - Examples: `tdx-ticket-search`, `tdx-asset-get`, `tdx-people-lookup`
 
-- **Modification Tools (22)** — Disabled by default, enable explicitly
+- **Modification Tools (22)** — Reachable only with a read-write API key
   - `create`, `update`, `patch`, `delete`, and `feed-add` operations
-  - Require `ALLOW_MODIFICATIONS=true` environment variable to enable
+  - Require `MCP_API_KEY_READWRITE`; hidden entirely from read-only keys
   - Examples: `tdx-ticket-create`, `tdx-asset-update`, `tdx-cmdb-delete`
 
-This design prevents accidental data changes when the server is first deployed. Enable modifications only when you're ready to allow write operations.
+Access is decided per request from the API key presented. A read-only key never sees write tools in `tools/list` and is rejected with `403` if it calls one directly.
 
 ## Environment Variables
 
@@ -87,41 +87,38 @@ All 44 tools are organized into **11 domains**, each with a separate registratio
 - **Ticket Types** (`src/tools/ticket-types.ts`) — 1 tool: ticket type lookups
 - **Attributes** (`src/tools/attributes.ts`) — 1 tool: custom attribute definitions
 
-### Safety-by-Default Registration Pattern
+### Access Control Pattern
 
-Each domain module exports two registration functions:
+Every domain module exports its read-only and modification registrations separately:
 
 ```typescript
-// Always registered - read-only tools (get, search, lookup)
+// Read-only tools (get, search, lookup)
 export function registerXxxReadOnlyTools(server, client) { ... }
 
-// Conditionally registered - modification tools (create, update, delete)
+// Modification tools (create, update, delete)
 export function registerXxxTools(server, client) { ... }
 ```
 
-This split ensures that:
-1. **Read-only tools are always available** for safe exploration and analysis
-2. **Modification tools require explicit opt-in** via `ALLOW_MODIFICATIONS=true`
-3. **New deployments are safe by default** — no accidental data changes until explicitly enabled
+Both groups are always registered on the MCP server. Enforcement happens in the HTTP
+wrapper, per request, based on the API key:
 
-In `src/index.ts`, registration calls implement the split:
+1. **Read-only keys** get write tools filtered out of `tools/list` and `/tools`, so clients never learn they exist
+2. **Write calls from a read-only key** are rejected with `403` before reaching the MCP process
+3. **Tools missing from `src/tool-access-config.ts`** are treated as read-write, so a new write tool is never exposed by omission
+
+In `src/index.ts`, a single call registers everything:
 ```typescript
-// Always called - read-only tools
-registerTicketReadOnlyTools(server, client);
-registerAssetReadOnlyTools(server, client);
-// ... etc for all domains ...
-
-// Conditionally called - modification tools
-registerIfAllowed(() => registerTicketTools(server, client), "registerTicketTools");
-registerIfAllowed(() => registerAssetTools(server, client), "registerAssetTools");
-// ... etc for all domains ...
+registerAllTools(server, client);
 ```
+
+> Because enforcement is in the wrapper, the stdio server must not be exposed directly —
+> anything speaking to it over stdio has full read-write access.
 
 ## Tools (43 Total: 21 Always-Available + 22 Modification)
 
 All tools that operate within an application accept an optional `appId` parameter to override the default from `TDX_APP_ID`.
 
-**Legend:** 🔒 = Always available (read-only access) | ✏️ = Modification (requires `ALLOW_MODIFICATIONS=true`)
+**Legend:** 🔒 = Available to any valid key (read-only) | ✏️ = Modification (requires `MCP_API_KEY_READWRITE`)
 
 ### Tickets (9 tools: 3 read-only + 6 modification)
 

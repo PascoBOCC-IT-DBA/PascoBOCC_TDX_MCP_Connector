@@ -61,8 +61,9 @@ export class RateLimiter {
   async acquire(priority: number = 0, timeoutMs: number = 300000): Promise<void> {
     const queuedRequestId = `req-${++this.requestCounter}`;
 
-    // Check if token immediately available
-    if (this.tokens >= 1) {
+    // Only skip the queue when nobody is waiting; otherwise an arriving request would
+    // overtake queued ones indefinitely under load, including higher-priority writes.
+    if (this.queue.length === 0 && this.tokens >= 1) {
       this.tokens -= 1;
       return Promise.resolve();
     }
