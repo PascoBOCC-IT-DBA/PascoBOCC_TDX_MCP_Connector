@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { TdxClient } from "../tdx-client.js";
 import { clampMaxResults } from "../config.js";
+import { toToolError } from "../errors.js";
 
 export function registerCmdbReadOnlyTools(server: McpServer, client: TdxClient) {
   // CMDB always uses TDAssets application
@@ -18,7 +19,7 @@ export function registerCmdbReadOnlyTools(server: McpServer, client: TdxClient) 
         const result = await client.get(`/${appId}/cmdb/${params.id}`);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );
@@ -47,7 +48,7 @@ export function registerCmdbReadOnlyTools(server: McpServer, client: TdxClient) 
         const result = await client.post(`/${appId}/cmdb/search`, body);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );
@@ -96,7 +97,7 @@ export function registerCmdbTools(server: McpServer, client: TdxClient) {
         const result = await client.post(`/${appId}/cmdb`, body);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );
@@ -113,7 +114,7 @@ export function registerCmdbTools(server: McpServer, client: TdxClient) {
         const result = await client.put(`/${appId}/cmdb/${params.id}`, params.data);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );
@@ -129,7 +130,7 @@ export function registerCmdbTools(server: McpServer, client: TdxClient) {
         await client.delete(`/${appId}/cmdb/${params.id}`);
         return { content: [{ type: "text", text: "CI deleted successfully" }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );
@@ -153,7 +154,7 @@ export function registerCmdbTools(server: McpServer, client: TdxClient) {
         const result = await client.post(`/${appId}/cmdb/${params.id}/feed`, body);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );
@@ -177,7 +178,7 @@ export function registerCmdbTools(server: McpServer, client: TdxClient) {
         const result = await client.put(`/${appId}/cmdb/${params.id}/relationships`, body);
         return { content: [{ type: "text", text: JSON.stringify(result ?? "Relationship added successfully", null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );

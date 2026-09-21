@@ -55,10 +55,21 @@ const INIT_TIMEOUT_MS = parseInt(process.env.MCP_INIT_TIMEOUT_MS || '30000', 10)
 const TOOLS_LIST_TIMEOUT_MS = parseInt(process.env.MCP_TOOLS_LIST_TIMEOUT_MS || '30000', 10);
 const TOOLS_CALL_TIMEOUT_MS = parseInt(process.env.MCP_TOOLS_CALL_TIMEOUT_MS || '180000', 10);
 
+/**
+ * Browser origins permitted to reach this server. Comma-separated; '*' restores the
+ * unrestricted behaviour. Empty (the default) means no browser origin is allowed.
+ */
+const ALLOWED_ORIGINS = (process.env.MCP_ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+const ALLOW_ANY_ORIGIN = ALLOWED_ORIGINS.includes('*');
+
 console.log(`[Startup] HTTP Wrapper initializing...`);
 console.log(`[Startup] PORT: ${PORT}`);
 console.log(`[Startup] API_KEY_READONLY: ${API_KEY_READONLY ? 'configured' : 'not configured'}`);
 console.log(`[Startup] API_KEY_READWRITE: ${API_KEY_READWRITE ? 'configured' : 'not configured'}`);
+console.log(`[Startup] Allowed origins: ${ALLOWED_ORIGINS.length ? ALLOWED_ORIGINS.join(', ') : 'none (non-browser clients only)'}`);
 console.log(`[Startup] MCP Script: ${MCPscriptPath}`);
 console.log(`[Startup] Request Timeout (default): ${REQUEST_TIMEOUT_MS}ms`);
 console.log(`[Startup] Request Timeout (initialize): ${INIT_TIMEOUT_MS}ms`);
@@ -260,6 +271,31 @@ function resolveEffectiveAccessLevel(keyAccessLevel: AccessLevel | null | undefi
 
 function isToolCallMethod(methodName: string): boolean {
   return methodName === 'tools/call' || methodName === 'call_tool';
+}
+
+/**
+ * DNS-rebinding defence recommended by the MCP HTTP transport spec.
+ *
+ * A request with no Origin header is not from a browser (curl, the Copilot connector, the
+ * MCP CLI) and is left alone -- auth here is header-based, so there is nothing a browser
+ * would attach automatically. A request that does carry one must be on the allowlist.
+ */
+function isOriginAllowed(origin: string | undefined): boolean {
+  if (!origin) return true;
+  if (ALLOW_ANY_ORIGIN) return true;
+  return ALLOWED_ORIGINS.includes(origin);
+}
+
+function corsHeaders(origin: string | undefined): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-API-Key, Api-Key',
+  };
+  if (origin && isOriginAllowed(origin)) {
+    headers['Access-Control-Allow-Origin'] = ALLOW_ANY_ORIGIN ? '*' : origin;
+    headers['Vary'] = 'Origin';
+  }
+  return headers;
 }
 
 /**
@@ -497,14 +533,25 @@ const server = http.createServer((req, res) => {
   }
 
   // CORS
+  const originHeaderRaw = req.headers.origin;
+  const origin = Array.isArray(originHeaderRaw) ? originHeaderRaw[0] : originHeaderRaw;
+  if (!isOriginAllowed(origin)) {
+    console.warn(`[Origin] Rejected ${req.method} ${req.url} from origin '${origin}' - add it to MCP_ALLOWED_ORIGINS to permit it`);
+    res.writeHead(403, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Origin not allowed' }));
+    return;
+  }
+
   if (req.method === 'OPTIONS') {
-    res.writeHead(200, {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization'
-    });
+    res.writeHead(204, corsHeaders(origin));
     res.end();
     return;
+  }
+
+  // Echo the allowed origin on the actual response too, so a permitted browser client can read it.
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', ALLOW_ANY_ORIGIN ? '*' : origin);
+    res.setHeader('Vary', 'Origin');
   }
 
   const isPublicEndpoint = req.url === '/health' || req.url === '/tools' || req.url === '/status';
@@ -634,6 +681,12 @@ const server = http.createServer((req, res) => {
         // Validate tool access for tools/call requests
         const effectiveAccessLevel = resolveEffectiveAccessLevel(caller.level);
         const effectiveCaller: Caller = { level: effectiveAccessLevel, keyId: caller.keyId };
+        if (isToolCallMethod(message.method)) {
+          // Every write reaches TDX as the one admin account, so this log is the only record
+          // of which key asked for it. Logged before the access check so denials appear too.
+          const toolName = message.params?.name ?? 'unknown';
+          console.log(`[Audit] ${describeCaller(effectiveCaller)} ${message.method} ${toolName} (requires ${getToolAccessLevel(toolName)})`);
+        }
         if (effectiveAccessLevel && isToolCallMethod(message.method)) {
           const toolName = message.params?.name;
           if (toolName && !canAccessTool(toolName, effectiveAccessLevel)) {

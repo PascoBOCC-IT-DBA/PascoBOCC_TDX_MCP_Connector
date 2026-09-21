@@ -3,6 +3,7 @@ import { z } from "zod";
 import { TdxClient } from "../tdx-client.js";
 import { clampMaxResults, loadMaxResultsLimits } from "../config.js";
 import { filterByResponsibleUid } from "./ticket-filters.js";
+import { toToolError } from "../errors.js";
 
 // Read-only ticket tools (always registered)
 export function registerTicketReadOnlyTools(server: McpServer, client: TdxClient) {
@@ -47,7 +48,7 @@ export function registerTicketReadOnlyTools(server: McpServer, client: TdxClient
           };
           return { content: [{ type: "text", text: JSON.stringify(trimmed, null, 2) }] };
         } catch (e: unknown) {
-          return { content: [{ type: "text", text: String(e) }], isError: true };
+          return toToolError(e);
         }
       }
     );
@@ -153,7 +154,7 @@ export function registerTicketReadOnlyTools(server: McpServer, client: TdxClient
         }));
         return { content: [{ type: "text", text: JSON.stringify(trimmed, null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );
@@ -185,7 +186,7 @@ export function registerTicketReadOnlyTools(server: McpServer, client: TdxClient
           : result;
         return { content: [{ type: "text", text: JSON.stringify(trimmed, null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );
@@ -242,7 +243,7 @@ export function registerTicketTools(server: McpServer, client: TdxClient) {
         const result = await client.post(`/${app}/tickets`, body);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );
@@ -261,7 +262,7 @@ export function registerTicketTools(server: McpServer, client: TdxClient) {
         const result = await client.post(`/${app}/tickets/${params.id}`, params.data);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );
@@ -286,7 +287,7 @@ export function registerTicketTools(server: McpServer, client: TdxClient) {
         const result = await client.patch(`/${app}/tickets/${params.id}`, patchDoc);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );
@@ -312,7 +313,7 @@ export function registerTicketTools(server: McpServer, client: TdxClient) {
         const result = await client.post(`/${app}/tickets/${params.id}/feed`, body);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );
@@ -331,7 +332,7 @@ export function registerTicketTools(server: McpServer, client: TdxClient) {
         const result = await client.post(`/${app}/tickets/${params.id}/assets/${params.assetId}`);
         return { content: [{ type: "text", text: JSON.stringify(result ?? "Asset linked successfully", null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );
@@ -350,7 +351,7 @@ export function registerTicketTools(server: McpServer, client: TdxClient) {
         const result = await client.post(`/${app}/tickets/${params.id}/contacts/${params.uid}`);
         return { content: [{ type: "text", text: JSON.stringify(result ?? "Contact added successfully", null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );

@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { TdxClient } from "../tdx-client.js";
 import { clampMaxResults } from "../config.js";
+import { toToolError } from "../errors.js";
 
 export function registerPeopleReadOnlyTools(server: McpServer, client: TdxClient) {
   server.tool(
@@ -15,7 +16,7 @@ export function registerPeopleReadOnlyTools(server: McpServer, client: TdxClient
         const result = await client.get(`/people/${params.uid}`);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );
@@ -65,7 +66,7 @@ export function registerPeopleReadOnlyTools(server: McpServer, client: TdxClient
           : result;
         return { content: [{ type: "text", text: JSON.stringify(people, null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );
@@ -86,7 +87,7 @@ export function registerPeopleReadOnlyTools(server: McpServer, client: TdxClient
         const result = await client.get("/people/lookup", query);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );
@@ -105,7 +106,7 @@ export function registerPeopleTools(server: McpServer, client: TdxClient) {
         const result = await client.post(`/people/${params.uid}`, params.data);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );

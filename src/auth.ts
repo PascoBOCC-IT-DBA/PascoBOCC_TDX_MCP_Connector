@@ -1,4 +1,5 @@
 import { TdxConfig } from "./config.js";
+import { redactSecrets } from "./errors.js";
 
 const TOKEN_LIFETIME_MS = 23 * 60 * 60 * 1000; // 23 hours (1h buffer before 24h expiry)
 
@@ -24,7 +25,6 @@ export class TdxAuth {
     const controller = new AbortController();
     const authUrl = `${this.config.baseUrl}/auth/loginadmin`;
     console.error(`[TDX Auth] Starting refresh: POST ${authUrl}`);
-    console.error(`[TDX Auth] BEID: ${this.config.beid}`);
     
     const timeoutId = setTimeout(() => {
       console.error(`[TDX Auth] ⚠️ TIMEOUT: Auth request exceeded 30s, aborting...`);
@@ -47,9 +47,10 @@ export class TdxAuth {
       console.error(`[TDX Auth] ✅ Response received at ${new Date().toISOString()}: HTTP ${res.status}`);
 
       if (!res.ok) {
-        const body = await res.text();
-        console.error(`[TDX Auth] ❌ Auth failed: ${body}`);
-        throw new Error(`TDX admin auth failed (${res.status}): ${body}`);
+        // This request carried the BEID and web services key, so the response may quote them back.
+        const body = redactSecrets(await res.text(), [this.config.webServicesKey, this.config.beid]);
+        console.error(`[TDX Auth] ❌ Auth failed (${res.status}): ${body.slice(0, 200)}`);
+        throw new Error(`TDX admin auth failed (${res.status})`);
       }
 
       this.token = await res.text();

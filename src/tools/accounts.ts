@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { TdxClient } from "../tdx-client.js";
 import { clampMaxResults } from "../config.js";
+import { toToolError } from "../errors.js";
 
 export function registerAccountTools(server: McpServer, client: TdxClient) {
   server.tool(
@@ -15,7 +16,7 @@ export function registerAccountTools(server: McpServer, client: TdxClient) {
         const result = await client.get(`/accounts/${params.id}`);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );
@@ -38,7 +39,7 @@ export function registerAccountTools(server: McpServer, client: TdxClient) {
         const result = await client.post("/accounts/search", body);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );

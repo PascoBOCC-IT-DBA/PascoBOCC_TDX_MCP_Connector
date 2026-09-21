@@ -3,6 +3,7 @@ import { z } from "zod";
 import { TdxClient } from "../tdx-client.js";
 import { clampMaxResults, loadMaxResultsLimits } from "../config.js";
 import { filterByResponsibleUid } from "./ticket-filters.js";
+import { toToolError } from "../errors.js";
 
 // Ticket count tool (always registered)
 export function registerTicketCountTools(server: McpServer, client: TdxClient) {
@@ -141,7 +142,7 @@ export function registerTicketCountTools(server: McpServer, client: TdxClient) {
 
         return { content: [{ type: "text", text: JSON.stringify(response, null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );

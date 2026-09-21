@@ -1,5 +1,6 @@
 import { TdxAuth } from "./auth.js";
 import { TdxConfig } from "./config.js";
+import { TdxApiError, ToolSafeError } from "./errors.js";
 import {
   RateLimitSnapshot,
   TdxRateLimitError,
@@ -67,7 +68,7 @@ export class TdxClient {
     }
     const requestedAppId = Number(firstSegment);
     if (!this.allowedAppIds.has(requestedAppId)) {
-      throw new Error(
+      throw new ToolSafeError(
         `appId ${requestedAppId} is not a configured TDX application for this server. ` +
         `Allowed app IDs: ${[...this.allowedAppIds].join(", ")}.`
       );
@@ -96,9 +97,8 @@ export class TdxClient {
       const res = await this.fetchWithRateLimitRetry(method, path, url, body, startTime, deadline);
 
       if (!res.ok) {
-        const text = await res.text();
-        console.error(`[TDX Client] ❌ API error: ${text.substring(0, 100)}`);
-        throw new Error(`TDX API error ${res.status} ${method} ${path}: ${text}`);
+        // The body stays on the error and is logged once by toToolError, never returned.
+        throw new TdxApiError(res.status, method, path, await res.text());
       }
 
       const text = await res.text();

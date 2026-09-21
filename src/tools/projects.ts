@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { TdxClient } from "../tdx-client.js";
 import { clampMaxResults, loadMaxResultsLimits } from "../config.js";
+import { toToolError } from "../errors.js";
 
 export function registerProjectReadOnlyTools(server: McpServer, client: TdxClient) {
   server.tool(
@@ -15,7 +16,7 @@ export function registerProjectReadOnlyTools(server: McpServer, client: TdxClien
         const result = await client.get(`/projects/${params.id}`);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );
@@ -56,7 +57,7 @@ export function registerProjectReadOnlyTools(server: McpServer, client: TdxClien
         const result = await client.post("/projects/search", body);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );
@@ -102,7 +103,7 @@ export function registerProjectTools(server: McpServer, client: TdxClient) {
         const result = await client.post("/projects", body);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );
@@ -119,7 +120,7 @@ export function registerProjectTools(server: McpServer, client: TdxClient) {
         const result = await client.post(`/projects/${params.id}`, params.data);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );

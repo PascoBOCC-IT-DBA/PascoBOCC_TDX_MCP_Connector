@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { TdxClient } from "../tdx-client.js";
 import { clampMaxResults, loadMaxResultsLimits } from "../config.js";
+import { toToolError } from "../errors.js";
 
 export function registerAssetReadOnlyTools(server: McpServer, client: TdxClient) {
   const defaultAppId = client.assetsAppId ?? client.appId;
@@ -19,7 +20,7 @@ export function registerAssetReadOnlyTools(server: McpServer, client: TdxClient)
         const result = await client.get(`/${app}/assets/${params.id}`);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );
@@ -68,7 +69,7 @@ export function registerAssetReadOnlyTools(server: McpServer, client: TdxClient)
         const result = await client.post(`/${app}/assets/search`, body);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );
@@ -83,7 +84,7 @@ export function registerAssetReadOnlyTools(server: McpServer, client: TdxClient)
         const result = await client.get(`/${app}/assets/forms`);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );
@@ -147,7 +148,7 @@ export function registerAssetTools(server: McpServer, client: TdxClient) {
         const result = await client.post(`/${app}/assets`, body);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );
@@ -166,7 +167,7 @@ export function registerAssetTools(server: McpServer, client: TdxClient) {
         const result = await client.post(`/${app}/assets/${params.id}`, params.data);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );
@@ -191,7 +192,7 @@ export function registerAssetTools(server: McpServer, client: TdxClient) {
         const result = await client.patch(`/${app}/assets/${params.id}`, patchDoc);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );
@@ -209,7 +210,7 @@ export function registerAssetTools(server: McpServer, client: TdxClient) {
         await client.delete(`/${app}/assets/${params.id}`);
         return { content: [{ type: "text", text: "Asset deleted successfully" }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );
@@ -235,7 +236,7 @@ export function registerAssetTools(server: McpServer, client: TdxClient) {
         const result = await client.post(`/${app}/assets/${params.id}/feed`, body);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );

@@ -1356,6 +1356,16 @@ Retrieves custom attribute definitions for a TDX component type.
 - `TDX_KB_APP_ID` - Application ID for knowledge base (if different from TDX_APP_ID)
 - `MCP_API_KEY_READONLY` - API key granting access to read-only tools only
 - `MCP_API_KEY_READWRITE` - API key granting access to all tools, including create/update/delete
+- `MCP_ALLOWED_ORIGINS` - Comma-separated browser origins allowed to call the server. Unset (the
+  default) rejects any request carrying an `Origin` header; requests without one (curl, the
+  Copilot connector, MCP CLI clients) are unaffected. Set to `*` to allow every origin.
+
+### Tool Errors
+
+Tool failures return `isError: true` with a short message and a correlation id, for example
+`TDX API error 400 on POST /1/tickets. (ref 3f9c1a02)`. The full upstream response is written to
+the server log under `[ToolError 3f9c1a02]` and is never sent to the caller. Quote the ref when
+asking an administrator to investigate.
 
 ### Common Patterns
 

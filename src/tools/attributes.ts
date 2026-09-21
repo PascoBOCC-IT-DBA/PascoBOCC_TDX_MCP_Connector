@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { TdxClient } from "../tdx-client.js";
+import { toToolError } from "../errors.js";
 
 export function registerAttributeTools(server: McpServer, client: TdxClient) {
   server.tool(
@@ -21,7 +22,7 @@ export function registerAttributeTools(server: McpServer, client: TdxClient) {
         const result = await client.get(`/attributes/custom?componentId=${params.componentId}&appId=${app}`, query);
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
-        return { content: [{ type: "text", text: String(e) }], isError: true };
+        return toToolError(e);
       }
     }
   );
