@@ -324,7 +324,7 @@ Key metrics:
 
 ### Configuration
 
-Rate limiting is controlled by environment variables (see [README.md](../README.md#environment-variables)):
+Rate limiting is controlled by environment variables (see [readme.md](../readme.md#environment-variables)):
 
 - `TDX_RATE_LIMIT_ENABLED` — Enable/disable (default: `true`)
 - `TDX_RATE_LIMIT_CALLS` — Calls per window (default: `100`)
@@ -432,7 +432,7 @@ function Search-TDXTickets {
 
 ## Available Tools
 
-See `/tools` endpoint or [TOOLS_REFERENCE.md](TOOLS_REFERENCE.md) for complete tool documentation.
+See `/tools` endpoint or [tools-reference.md](tools-reference.md) for complete tool documentation.
 
 Common categories:
 - **Tickets**: Create, search, get, update, feed operations

@@ -239,10 +239,10 @@ Invoke-WebRequest -Uri $url -Headers $headers
 
 ```
 docs/
-├── DEPLOYMENT.md                   # Comprehensive deployment guide (this file)
-├── KEYVAULT_SECRETS_SETUP.md       # Detailed Key Vault setup guide
-├── API_REFERENCE.md
-└── TOOLS_REFERENCE.md
+├── deployment.md                   # Comprehensive deployment guide (this file)
+├── keyvault-secrets-setup.md       # Detailed Key Vault setup guide
+├── api-reference.md
+└── tools-reference.md
 
 deploy/azure-app-service/
 ├── create-keyvault-secrets.ps1    # Create/manage secrets in Key Vault
@@ -287,9 +287,9 @@ az webapp restart --resource-group TDX-MCP --name TDX-MCP-APP
 
 ## 📚 Additional Documentation
 
-- [Key Vault Secrets Setup](./KEYVAULT_SECRETS_SETUP.md)
-- [API Reference](./API_REFERENCE.md)
-- [Tools Reference](./TOOLS_REFERENCE.md)
+- [Key Vault Secrets Setup](./keyvault-secrets-setup.md)
+- [API Reference](./api-reference.md)
+- [Tools Reference](./tools-reference.md)
 
 ---
 

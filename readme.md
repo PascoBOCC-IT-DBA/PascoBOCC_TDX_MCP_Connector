@@ -19,7 +19,7 @@ This server exposes **44 tools** across **11 domains** — tickets, ticket types
 
 ### Production Deployment
 
-For Azure App Service deployment (current production), see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
+For Azure App Service deployment (current production), see [docs/deployment.md](docs/deployment.md)
 
 ## Tool Availability & Safety-by-Default Design
 
@@ -227,7 +227,7 @@ Common `componentId` values for `tdx-attributes-get`: `9` = Ticket, `27` = Asset
 
 ## Deployment
 
-For deployment instructions, see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
+For deployment instructions, see [docs/deployment.md](docs/deployment.md)
 
 ## Documentation
 
@@ -235,12 +235,12 @@ For deployment instructions, see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
 
 | Document | Purpose |
 |----------|---------|
-| **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** | Complete Azure App Service deployment guide (prerequisites, workflow, troubleshooting) |
-| **[docs/KEYVAULT_SECRETS_SETUP.md](docs/KEYVAULT_SECRETS_SETUP.md)** | Azure Key Vault secrets configuration (required for all deployments) |
-| **[docs/TOOLS_REFERENCE.md](docs/TOOLS_REFERENCE.md)** | Complete reference for all 44 tools with parameters, return structures, and usage examples |
-| **[docs/API_REFERENCE.md](docs/API_REFERENCE.md)** | TDX API endpoints, authentication, and technical reference |
+| **[docs/deployment.md](docs/deployment.md)** | Complete Azure App Service deployment guide (prerequisites, workflow, troubleshooting) |
+| **[docs/keyvault-secrets-setup.md](docs/keyvault-secrets-setup.md)** | Azure Key Vault secrets configuration (required for all deployments) |
+| **[docs/tools-reference.md](docs/tools-reference.md)** | Complete reference for all 44 tools with parameters, return structures, and usage examples |
+| **[docs/api-reference.md](docs/api-reference.md)** | TDX API endpoints, authentication, and technical reference |
 
-For complete tool documentation, see [docs/TOOLS_REFERENCE.md](docs/TOOLS_REFERENCE.md).
+For complete tool documentation, see [docs/tools-reference.md](docs/tools-reference.md).
 
 ## Example Usage
 
@@ -283,10 +283,10 @@ PascoBOCC_TDX_MCP_Connector/
       ticket-types.ts      # 1 ticket type lookup tool
       attributes.ts        # 1 custom attributes tool
   docs/
-    DEPLOYMENT.md          # Azure App Service deployment guide
-    KEYVAULT_SECRETS_SETUP.md  # Key Vault secrets setup
-    TOOLS_REFERENCE.md     # Complete tool documentation
-    API_REFERENCE.md       # TDX API reference
+    deployment.md          # Azure App Service deployment guide
+    keyvault-secrets-setup.md  # Key Vault secrets setup
+    tools-reference.md     # Complete tool documentation
+    api-reference.md       # TDX API reference
   deploy/
     azure-app-service/
       create-keyvault-secrets.ps1   # Script to create secrets in Key Vault
