@@ -40,3 +40,6 @@ docker/
 
 # Test & Query Scripts
 /tests
+
+# Local Research or Upgrade Plans
+research/
