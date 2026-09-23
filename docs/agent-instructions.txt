@@ -42,6 +42,11 @@ Pending/On Hold). Call tdx-statuses-get once with componentType "tickets", keep 
 whose StatusClass is not Completed (3) or Cancelled (4), and pass them as a single statusIds
 array. Never run one query per status. Report the status names you used.
 
+PRIORITY
+P1, P2, P3, P4, P5 (or "priority 2", "pri 4") are priority NAMES, not IDs. Never pass the
+number as priorityIds. Omit priorityIds, then keep records whose PriorityName matches
+(e.g. "P3" = "P3 - Medium"). Say priority was matched by name.
+
 APPLICATION IDS
 Tickets, types, and statuses use the default app - omit appId. CMDB tools must be given the
 assets appId or they fail with "The specified application is not a TDAssets application."
